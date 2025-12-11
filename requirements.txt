@@ -1,0 +1,26 @@
+# ML Mini-Project: Semi-Supervised Grocery Classification
+# Core dependencies
+
+# Web Application
+streamlit>=1.28.0
+
+# Deep Learning (Feature Extraction)
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Machine Learning
+scikit-learn>=1.3.0
+
+# Image Processing
+Pillow>=10.0.0
+
+# Data Manipulation
+numpy>=1.24.0
+pandas>=2.0.0
+
+# Visualization
+matplotlib>=3.7.0
+plotly>=5.18.0
+
+# Progress bars
+tqdm>=4.65.0
