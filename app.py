@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from src.data_utils import CLASS_NAMES, IDX_TO_CLASS, get_dataset_stats
 from src.feature_extraction import FeatureExtractor
 from src.semi_supervised import SemiSupervisedClassifier
+from src.recipe_utils import RecipeRecommender
 
 
 # ============================================================================
@@ -211,6 +212,12 @@ if 'models' not in st.session_state:
 if 'training_results' not in st.session_state:
     st.session_state.training_results = None
 
+if 'recipe_recommender' not in st.session_state:
+    st.session_state.recipe_recommender = None
+
+if 'grocery_list' not in st.session_state:
+    st.session_state.grocery_list = []  # List of dicts: {'name': str, 'image': PIL.Image}
+
 
 # ============================================================================
 # Helper Functions
@@ -237,6 +244,15 @@ def load_training_results():
     if os.path.exists(results_path):
         with open(results_path, 'r') as f:
             return json.load(f)
+    return None
+
+
+@st.cache_resource
+def load_recipe_recommender():
+    """Load the recipe recommender (cached)."""
+    data_path = "DS3RECIPES/Food Ingredients and Recipe Dataset with Image Name Mapping.csv"
+    if os.path.exists(data_path):
+        return RecipeRecommender(data_path)
     return None
 
 
@@ -299,7 +315,7 @@ with st.sidebar:
     
     page = st.radio(
         "Navigation",
-        ["🏠 Home", "🔍 Predict", "📊 Dataset Explorer", "📈 Model Performance", "ℹ️ About"],
+        ["🏠 Home", "🔍 Predict", "🍳 Recipe Recommender", "📊 Dataset Explorer", "📈 Model Performance", "ℹ️ About"],
         label_visibility="collapsed"
     )
     
@@ -522,6 +538,21 @@ elif page == "🔍 Predict":
                             
                             st.plotly_chart(fig, use_container_width=True)
                             
+                            # Add to grocery list
+                            # Check if item already exists to avoid duplicates (optional, but good UX)
+                            # We allow duplicates if user wants to add multiple items, but maybe unique is better?
+                            # Let's just append for now as requested "fill after each image prediction"
+                            
+                            # Store a thumbnail for the list
+                            thumb = image.copy()
+                            thumb.thumbnail((100, 100))
+                            
+                            st.session_state.grocery_list.append({
+                                'name': predicted_class,
+                                'image': thumb
+                            })
+                            st.toast(f"Added {predicted_class} to your grocery list!", icon="🛒")
+                            
                         except Exception as e:
                             st.error(f"Error during prediction: {str(e)}")
             else:
@@ -532,6 +563,23 @@ elif page == "🔍 Predict":
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
+
+        # Grocery List Display (Full width below columns)
+        st.markdown("---")
+        st.markdown("### 📝 My Grocery List")
+        
+        if st.session_state.grocery_list:
+            if st.button("🗑️ Clear List"):
+                st.session_state.grocery_list = []
+                st.rerun()
+                
+            cols = st.columns(6)
+            for i, item in enumerate(st.session_state.grocery_list):
+                col_idx = i % 6
+                with cols[col_idx]:
+                    st.image(item['image'], caption=item['name'].title(), use_container_width=True)
+        else:
+            st.info("Your grocery list is empty. Predict items to add them here!")
 
 
 # ============================================================================
@@ -777,6 +825,114 @@ elif page == "📈 Model Performance":
                         <p><strong>Test:</strong> <span style="color: #f97316;">{test_acc:.1f}%</span></p>
                     </div>
                     """, unsafe_allow_html=True)
+
+
+# ============================================================================
+# Page: Recipe Recommender
+# ============================================================================
+
+elif page == "🍳 Recipe Recommender":
+    st.markdown('<h1 class="main-header">🍳 Recipe Recommender</h1>', unsafe_allow_html=True)
+    
+    # Load recommender
+    if st.session_state.recipe_recommender is None:
+        with st.spinner("Loading recipe database..."):
+            st.session_state.recipe_recommender = load_recipe_recommender()
+            
+    if st.session_state.recipe_recommender is None:
+        st.error("Recipe dataset not found. Please ensure the DS3RECIPES directory exists.")
+    else:
+        st.markdown("""
+        <div class="glass-card">
+            <h3>Find Recipes by Ingredients</h3>
+            <p style="color: #94a3b8;">
+                Enter the ingredients you have, and we'll suggest recipes you can make!
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Ingredient input
+        
+        # Pre-fill with grocery list items if available
+        grocery_list_names = [item['name'] for item in st.session_state.grocery_list]
+        grocery_list_str = ", ".join(grocery_list_names)
+        
+        if grocery_list_names:
+            st.info(f"✨ Including {len(grocery_list_names)} items from your grocery list: {grocery_list_str}")
+        
+        ingredients_input = st.text_area(
+            "Enter additional ingredients (comma separated)",
+            placeholder="e.g., salt, pepper",
+            height=100
+        )
+        
+        if st.button("🍳 Find Recipes"):
+            all_ingredients = grocery_list_names.copy()
+            
+            if ingredients_input.strip():
+                manual_ingredients = [i.strip() for i in ingredients_input.split(',')]
+                all_ingredients.extend(manual_ingredients)
+            
+            if not all_ingredients:
+                st.warning("Please enter some ingredients or add items to your grocery list first.")
+            else:
+                with st.spinner("Searching for recipes..."):
+                    recommendations = st.session_state.recipe_recommender.search_recipes(
+                        all_ingredients, 
+                        top_k=5
+                    )
+                
+                if not recommendations:
+                    st.info("No matching recipes found. Try adding more ingredients!")
+                else:
+                    st.markdown("### 🥗 Recommended Recipes")
+                    
+                    for i, rec in enumerate(recommendations):
+                        match_pct = rec['Match_Percentage'] * 100
+                        missing_count = len(rec['Missing_Ingredients'])
+                        
+                        # Determine card border color based on match
+                        border_color = "#10b981" if match_pct > 75 else "#f97316" if match_pct > 40 else "#64748b"
+                        
+                        with st.expander(f"{rec['Title']} (Match: {match_pct:.0f}%)"):
+                            col1, col2 = st.columns([1, 2])
+                            
+                            with col1:
+                                # Try to load image if available
+                                img_name = rec['Image_Name']
+                                # FIX: Update path to nested folder
+                                img_path = Path("DS3RECIPES/Food Images/Food Images") / f"{img_name}.jpg"
+                                
+                                if img_path.exists():
+                                    st.image(str(img_path), use_container_width=True)
+                                else:
+                                    st.markdown("📷 No image available")
+                                    
+                                st.markdown(f"""
+                                <div style="margin-top: 1rem; text-align: center;">
+                                    <div style="font-size: 2rem; font-weight: bold; color: {border_color};">
+                                        {match_pct:.0f}%
+                                    </div>
+                                    <div style="color: #94a3b8; font-size: 0.8rem;">Match Score</div>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            
+                            with col2:
+                                st.markdown("#### 📝 Instructions")
+                                st.write(rec['Instructions'])
+                                
+                                st.markdown("#### ✅ Matching Ingredients")
+                                matching_html = ""
+                                for ing in rec['Matching_Ingredients']:
+                                    matching_html += f'<span class="class-chip" style="background: rgba(16, 185, 129, 0.2); color: #10b981; border-color: rgba(16, 185, 129, 0.3);">{ing}</span>'
+                                st.markdown(matching_html, unsafe_allow_html=True)
+                                
+                                if missing_count > 0:
+                                    st.markdown(f"#### 🛒 Missing Ingredients ({missing_count})")
+                                    missing_html = ""
+                                    for ing in rec['Missing_Ingredients']:
+                                        missing_html += f'<span class="class-chip" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">{ing}</span>'
+                                    st.markdown(missing_html, unsafe_allow_html=True)
 
 
 # ============================================================================
