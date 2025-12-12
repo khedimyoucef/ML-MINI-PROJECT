@@ -13,6 +13,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+import torch.optim as optim
 from torchvision import models
 from tqdm import tqdm
 
@@ -21,40 +22,54 @@ from .data_utils import GroceryDataset, get_image_transform, load_image_for_pred
 
 class FeatureExtractor:
     """
-    Feature extractor using pretrained ResNet18.
+    Feature extractor using pretrained ResNet50.
     
-    Extracts 512-dimensional feature vectors from images using
-    a pretrained ResNet18 model with the classification layer removed.
+    Extracts 2048-dimensional feature vectors from images using
+    a pretrained ResNet50 model. Can be fine-tuned on labeled data.
     """
     
-    def __init__(self, device: Optional[str] = None):
+    def __init__(self, device: Optional[str] = None, model_path: Optional[str] = None):
         """
         Initialize the feature extractor.
         
         Args:
             device: Device to use ('cuda', 'cpu', or None for auto-detect)
+            model_path: Optional path to load fine-tuned weights from
         """
         if device is None:
             self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         else:
             self.device = torch.device(device)
         
-        # Load pretrained ResNet18
-        self.model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
+        # Load pretrained ResNet50
+        self.model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
+        
+        # Save feature dim before removing last layer
+        self.feature_dim = self.model.fc.in_features  # 2048 for ResNet50
         
         # Remove the final classification layer
-        # This gives us the 512-dimensional feature vector
         self.model = nn.Sequential(*list(self.model.children())[:-1])
         
-        # Set to evaluation mode
+        # Load fine-tuned weights if provided
+        if model_path and os.path.exists(model_path):
+            print(f"Loading feature extractor weights from {model_path}")
+            self.load(model_path)
+        
+        # Set to evaluation mode by default
         self.model.eval()
         self.model.to(self.device)
         
-        # Feature dimension
-        self.feature_dim = 512
-        
         # Image transform
         self.transform = get_image_transform()
+    
+    def save(self, path: str):
+        """Save model weights to path."""
+        torch.save(self.model.state_dict(), path)
+        print(f"Feature extractor saved to {path}")
+        
+    def load(self, path: str):
+        """Load model weights from path."""
+        self.model.load_state_dict(torch.load(path, map_location=self.device))
     
     @torch.no_grad()
     def extract_single(self, image_tensor: torch.Tensor) -> np.ndarray:
@@ -161,6 +176,114 @@ class FeatureExtractor:
         print(f"Cached features to {cache_path}")
         
         return features, labels
+
+    
+    def fine_tune(
+        self,
+        train_loader: DataLoader,
+        val_loader: Optional[DataLoader] = None,
+        num_classes: int = 20,
+        epochs: int = 5,
+        learning_rate: float = 1e-4
+    ):
+        """
+        Fine-tune the model on labeled data.
+        
+        Args:
+            train_loader: DataLoader for labeled training data
+            val_loader: Optional DataLoader for validation
+            num_classes: Number of classes for the temporary classification head
+            epochs: Number of epochs to train
+            learning_rate: Learning rate for optimizer
+        """
+        print(f"\nFine-tuning feature extractor for {epochs} epochs...")
+        
+        # Restore classification head for training
+        # We need to recreate the full model structure temporarily
+        # The current self.model is just the feature extractor (Sequential)
+        
+        # Create a temporary classification head
+        classifier = nn.Linear(self.feature_dim, num_classes).to(self.device)
+        
+        # Optimizer
+        # Train both the backbone and the new head, but with different LRs if needed
+        # Here we use same LR for simplicity, but low magnitude
+        
+        optimizer = optim.Adam([
+            {'params': self.model.parameters()},
+            {'params': classifier.parameters()}
+        ], lr=learning_rate)
+        
+        criterion = nn.CrossEntropyLoss()
+        
+        # Training loop
+        for epoch in range(epochs):
+            self.model.train()
+            classifier.train()
+            
+            running_loss = 0.0
+            correct = 0
+            total = 0
+            
+            pbar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}")
+            
+            for images, labels in pbar:
+                images, labels = images.to(self.device), labels.to(self.device)
+                
+                optimizer.zero_grad()
+                
+                # Forward pass
+                features = self.model(images)
+                features = features.flatten(1)
+                outputs = classifier(features)
+                
+                loss = criterion(outputs, labels)
+                
+                # Backward pass
+                loss.backward()
+                optimizer.step()
+                
+                # Stats
+                running_loss += loss.item() * images.size(0)
+                _, predicted = outputs.max(1)
+                total += labels.size(0)
+                correct += predicted.eq(labels).sum().item()
+                
+                pbar.set_postfix({
+                    'loss': running_loss / total,
+                    'acc': correct / total
+                })
+            
+            train_loss = running_loss / total
+            train_acc = correct / total
+            
+            # Validation
+            val_info = ""
+            if val_loader:
+                self.model.eval()
+                classifier.eval()
+                val_correct = 0
+                val_total = 0
+                
+                with torch.no_grad():
+                    for images, labels in val_loader:
+                        images, labels = images.to(self.device), labels.to(self.device)
+                        features = self.model(images).flatten(1)
+                        outputs = classifier(features)
+                        _, predicted = outputs.max(1)
+                        val_total += labels.size(0)
+                        val_correct += predicted.eq(labels).sum().item()
+                
+                val_acc = val_correct / val_total
+                val_info = f" | Val Acc: {val_acc:.4f}"
+            
+            print(f"Epoch {epoch+1}: Loss: {train_loss:.4f} | Acc: {train_acc:.4f}{val_info}")
+        
+        # Cleanup
+        del classifier
+        del optimizer
+        self.model.eval()  # Return to eval mode for feature extraction
+        print("Fine-tuning complete.")
 
 
 def extract_dataset_features(

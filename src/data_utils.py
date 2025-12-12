@@ -49,6 +49,28 @@ def get_image_transform(image_size: int = 224) -> transforms.Compose:
     ])
 
 
+def get_training_transform(image_size: int = 224) -> transforms.Compose:
+    """
+    Get the training image preprocessing transform with augmentation.
+    
+    Args:
+        image_size: Target size for images
+        
+    Returns:
+        Composed transform for image preprocessing
+    """
+    return transforms.Compose([
+        transforms.RandomResizedCrop(image_size),
+        transforms.RandomHorizontalFlip(),
+        transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4),
+        transforms.ToTensor(),
+        transforms.Normalize(
+            mean=[0.485, 0.456, 0.406],
+            std=[0.229, 0.224, 0.225]
+        )
+    ])
+
+
 class GroceryDataset(Dataset):
     """
     PyTorch Dataset for the grocery classification dataset.
@@ -72,7 +94,10 @@ class GroceryDataset(Dataset):
         """
         self.data_dir = Path(data_dir) / split
         self.split = split
-        self.transform = transform or get_image_transform()
+        if transform:
+            self.transform = transform
+        else:
+            self.transform = get_training_transform() if split == 'train' else get_image_transform()
         self.max_samples_per_class = max_samples_per_class
         
         self.samples: List[Tuple[str, int]] = []

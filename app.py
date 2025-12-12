@@ -219,6 +219,9 @@ if 'training_results' not in st.session_state:
 @st.cache_resource
 def load_feature_extractor():
     """Load the feature extractor (cached)."""
+    model_path = "models/feature_extractor.pth"
+    if os.path.exists(model_path):
+        return FeatureExtractor(model_path=model_path)
     return FeatureExtractor()
 
 
@@ -295,7 +298,7 @@ with st.sidebar:
     st.markdown("## 🎛️ Navigation")
     
     page = st.radio(
-        "",
+        "Navigation",
         ["🏠 Home", "🔍 Predict", "📊 Dataset Explorer", "📈 Model Performance", "ℹ️ About"],
         label_visibility="collapsed"
     )

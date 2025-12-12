@@ -1,3 +1,8 @@
 DS1PRODUCTS/
 DS2GROCERIES/
 archive.zip
+src/__pycache__/
+features/
+models/
+models_test/
+OnlineTestImages/

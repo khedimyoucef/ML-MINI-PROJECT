@@ -11,6 +11,8 @@ import argparse
 from pathlib import Path
 import numpy as np
 import json
+from torch.utils.data import Subset, DataLoader
+import torch
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -19,7 +21,11 @@ from src.data_utils import (
     GroceryDataset, 
     create_semi_supervised_split,
     CLASS_NAMES,
-    get_dataset_stats
+    create_semi_supervised_split,
+    CLASS_NAMES,
+    get_dataset_stats,
+    get_training_transform,
+    get_image_transform
 )
 from src.feature_extraction import FeatureExtractor, extract_dataset_features
 from src.semi_supervised import (
@@ -68,18 +74,78 @@ def train_models(
         print(f"  {split}: {split_stats['total']} images")
     
     # Load or extract features
-    print("\n🔧 Feature Extraction:")
+    print("\n🔧 Feature Extraction & Fine-Tuning:")
     extractor = FeatureExtractor(device=device)
     
-    # Training data
-    print("\n  Processing training data...")
-    train_dataset = GroceryDataset(
+    # 1. Prepare Training Data
+    print("\n  Preparing training data...")
+    # Standard dataset for feature extraction (no augmentation)
+    train_dataset_full = GroceryDataset(
         data_dir, 
         split='train',
+        transform=get_image_transform(),
         max_samples_per_class=max_samples_per_class
     )
-    train_cache = os.path.join(features_dir, 'train_features.npz')
-    X_train, y_train = extractor.extract_and_cache(train_dataset, train_cache)
+    
+    # Augmented dataset for fine-tuning
+    train_dataset_aug = GroceryDataset(
+        data_dir, 
+        split='train',
+        transform=get_training_transform(),
+        max_samples_per_class=max_samples_per_class
+    )
+    
+    # 2. Create Semi-Supervised Split
+    # We do this BEFORE feature extraction now, because we need to know
+    # which samples are labeled to fine-tune on them.
+    print(f"\n🏷️ Creating semi-supervised split ({labeled_ratio*100:.0f}% labeled)...")
+    y_train_full = train_dataset_full.get_labels()
+    
+    y_train_ssl, labeled_mask = create_semi_supervised_split(
+        y_train_full, 
+        labeled_ratio=labeled_ratio
+    )
+    n_labeled = labeled_mask.sum()
+    n_unlabeled = (~labeled_mask).sum()
+    print(f"  Labeled samples: {n_labeled}")
+    print(f"  Unlabeled samples: {n_unlabeled}")
+    
+    # 3. Fine-Tune on Labeled Data
+    print("\n🎓 Fine-tuning ResNet50 on labeled subset...")
+    labeled_indices = np.where(labeled_mask)[0]
+    labeled_subset = Subset(train_dataset_aug, labeled_indices)
+    
+    labeled_loader = DataLoader(
+        labeled_subset,
+        batch_size=32,
+        shuffle=True,
+        num_workers=0
+    )
+    
+    # Fine-tune the extractor
+    extractor.fine_tune(
+        labeled_loader,
+        epochs=10,  # 10 epochs for fine-tuning
+        learning_rate=1e-4
+    )
+    
+    # Save fine-tuned feature extractor
+    extractor_path = os.path.join(output_dir, "feature_extractor.pth")
+    extractor.save(extractor_path)
+    print(f"  ✓ Saved fine-tuned feature extractor to {extractor_path}")
+    
+    # 4. Extract Features (using fine-tuned model)
+    print("\n  Extracting features with fine-tuned model...")
+    
+    # Train features
+    train_cache = os.path.join(features_dir, f'train_features_finetuned_{labeled_ratio}.npz')
+    # We force recompute because the model has changed (fine-tuned)
+    # and we don't want to load old non-finetuned features
+    X_train, y_train = extractor.extract_and_cache(
+        train_dataset_full, 
+        train_cache,
+        force_recompute=True
+    )
     print(f"  Training features shape: {X_train.shape}")
     
     # Test data
@@ -89,20 +155,14 @@ def train_models(
         split='test',
         max_samples_per_class=max_samples_per_class
     )
-    test_cache = os.path.join(features_dir, 'test_features.npz')
-    X_test, y_test = extractor.extract_and_cache(test_dataset, test_cache)
-    print(f"  Test features shape: {X_test.shape}")
-    
-    # Create semi-supervised split
-    print(f"\n🏷️ Creating semi-supervised split ({labeled_ratio*100:.0f}% labeled)...")
-    y_train_ssl, labeled_mask = create_semi_supervised_split(
-        y_train, 
-        labeled_ratio=labeled_ratio
+    test_cache = os.path.join(features_dir, 'test_features_resnet50.npz')
+    # Force recompute to use the fine-tuned model
+    X_test, y_test = extractor.extract_and_cache(
+        test_dataset, 
+        test_cache,
+        force_recompute=True
     )
-    n_labeled = labeled_mask.sum()
-    n_unlabeled = (~labeled_mask).sum()
-    print(f"  Labeled samples: {n_labeled}")
-    print(f"  Unlabeled samples: {n_unlabeled}")
+    print(f"  Test features shape: {X_test.shape}")
     
     # Train and evaluate each algorithm
     print("\n🤖 Training Semi-Supervised Models:")

@@ -80,15 +80,15 @@ class SemiSupervisedClassifier:
             # Self-Training with a base classifier
             base_classifier = self.kwargs.get('base_classifier', None)
             if base_classifier is None:
-                # Default to SVM with probability estimates
-                base_classifier = SVC(
-                    kernel='rbf',
-                    probability=True,
+                # Default to Random Forest for better scalability
+                base_classifier = RandomForestClassifier(
+                    n_estimators=100,
+                    n_jobs=-1,
                     random_state=42
                 )
             
             self.model = SelfTrainingClassifier(
-                base_estimator=base_classifier,
+                estimator=base_classifier,
                 threshold=self.kwargs.get('threshold', 0.75),
                 max_iter=self.kwargs.get('max_iter', 10),
                 verbose=self.kwargs.get('verbose', False)

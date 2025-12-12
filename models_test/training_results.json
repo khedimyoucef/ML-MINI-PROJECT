@@ -1,0 +1,49 @@
+{
+  "label_propagation": {
+    "train_accuracy": 0.05,
+    "test_accuracy": 0.05,
+    "n_labeled": 20,
+    "n_unlabeled": 180
+  },
+  "label_spreading": {
+    "train_accuracy": 0.15,
+    "test_accuracy": 0.065,
+    "n_labeled": 20,
+    "n_unlabeled": 180
+  },
+  "self_training": {
+    "train_accuracy": 1.0,
+    "test_accuracy": 0.18,
+    "n_labeled": 20,
+    "n_unlabeled": 180
+  },
+  "metadata": {
+    "labeled_ratio": 0.1,
+    "n_train_samples": 200,
+    "n_test_samples": 200,
+    "feature_dim": 2048,
+    "n_classes": 20,
+    "class_names": [
+      "bacon",
+      "banana",
+      "bread",
+      "broccoli",
+      "butter",
+      "carrots",
+      "cheese",
+      "chicken",
+      "cucumber",
+      "eggs",
+      "fish",
+      "lettuce",
+      "milk",
+      "onions",
+      "peppers",
+      "potatoes",
+      "sausages",
+      "spinach",
+      "tomato",
+      "yogurt"
+    ]
+  }
+}
