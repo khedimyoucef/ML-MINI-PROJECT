@@ -66,6 +66,10 @@ The app will open in your browser at `http://localhost:8501`
 
 ```
 ML-MINI-PROJECT/
+|DS3RECIPES/
+|   ├──Food Images/
+|   ├──Food Ingredients and Recipe Dataset with Image Name Mapping.csv
+|
 ├── DS2GROCERIES/           # Dataset
 │   ├── train/              # Training images
 │   ├── test/               # Test images
