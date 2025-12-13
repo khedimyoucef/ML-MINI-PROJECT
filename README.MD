@@ -16,6 +16,17 @@ This project demonstrates the power of **semi-supervised learning** for image cl
 - **sepciality** Artificial Intelligence and DataScience
 - **Course**: Machine Learning
 
+## To Test the app directly
+
+# deployed app url
+
+- https://ml-mini-project-khedim-youcef.streamlit.app/
+
+# Note that :
+
+if the deployed app is not working then i may need some time to push the entire project to git using git LFS
+as the size can be multiple gigabytes for the extracted features , trained models and the full datasets
+
 ## Used Datasets
 
 # The Main Dataset Used
