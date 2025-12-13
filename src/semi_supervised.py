@@ -13,7 +13,14 @@ from sklearn.semi_supervised import LabelPropagation, LabelSpreading, SelfTraini
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.metrics import (
+    accuracy_score, 
+    classification_report, 
+    confusion_matrix,
+    f1_score,
+    recall_score,
+    precision_score
+)
 import joblib
 from pathlib import Path
 
@@ -58,7 +65,11 @@ class SemiSupervisedClassifier:
     def _create_model(self):
         """Create the underlying model based on algorithm choice."""
         if self.algorithm == 'label_propagation':
-            # Label Propagation uses k-NN graph
+            # Label Propagation:
+            # This algorithm builds a graph where nodes are data points.
+            # Edges represent similarity between points (using k-Nearest Neighbors).
+            # Labels "flow" from labeled nodes to unlabeled nodes based on these edges.
+            # It's like spreading ink on a network: if a node is connected to many "Red" nodes, it becomes Red.
             self.model = LabelPropagation(
                 kernel=self.kwargs.get('kernel', 'knn'),
                 n_neighbors=self.kwargs.get('n_neighbors', 7),
@@ -67,7 +78,11 @@ class SemiSupervisedClassifier:
             )
         
         elif self.algorithm == 'label_spreading':
-            # Label Spreading with normalized Laplacian
+            # Label Spreading:
+            # Similar to Label Propagation, but uses a "Normalized Graph Laplacian".
+            # This makes it more robust to noise and irregular graph structures.
+            # The 'alpha' parameter controls how much the initial labels can change.
+            # It essentially "smooths" the labels over the graph.
             self.model = LabelSpreading(
                 kernel=self.kwargs.get('kernel', 'knn'),
                 n_neighbors=self.kwargs.get('n_neighbors', 7),
@@ -77,7 +92,12 @@ class SemiSupervisedClassifier:
             )
         
         elif self.algorithm == 'self_training':
-            # Self-Training with a base classifier
+            # Self-Training:
+            # This is a wrapper around a standard supervised classifier (like Random Forest).
+            # 1. Train the classifier on the small labeled set.
+            # 2. Use it to predict labels for the unlabeled set.
+            # 3. Take the most confident predictions and add them to the labeled set as "pseudo-labels".
+            # 4. Repeat step 1 with the larger labeled set.
             base_classifier = self.kwargs.get('base_classifier', None)
             if base_classifier is None:
                 # Default to Random Forest for better scalability
@@ -106,10 +126,15 @@ class SemiSupervisedClassifier:
             self
         """
         # Normalize features if requested
+        # Standardization (mean=0, std=1) is crucial for many ML algorithms,
+        # especially those based on distance (like k-NN in Label Propagation).
+        # It ensures that all features contribute equally to the distance calculation.
         if self.scaler is not None:
             X = self.scaler.fit_transform(X)
         
         # Fit the model
+        # For semi-supervised models, X contains BOTH labeled and unlabeled data.
+        # y contains labels for labeled data, and -1 for unlabeled data.
         self.model.fit(X, y)
         
         return self
@@ -275,20 +300,51 @@ def train_and_evaluate(
     clf.fit(X_train, y_train)
     
     # Evaluate
+    # Calculate comprehensive metrics
+    # We use 'weighted' average to account for class imbalance, which is common in real-world datasets
     train_acc = clf.score(X_train[y_train != -1], y_train[y_train != -1])
     test_acc = clf.score(X_test, y_test)
     
+    # Get predictions for detailed metrics
+    y_pred = clf.predict(X_test)
+    
+    # Calculate F1 Score
+    # F1 Score is the harmonic mean of precision and recall.
+    # It provides a balance between the two.
+    # We use 'weighted' average to account for class imbalance (some classes have more samples than others).
+    f1 = f1_score(y_test, y_pred, average='weighted')
+    
+    # Calculate Recall
+    # Recall (Sensitivity) measures the proportion of actual positives that were correctly identified.
+    # "Out of all the actual apples, how many did we correctly label as apples?"
+    recall = recall_score(y_test, y_pred, average='weighted')
+    
+    # Calculate Precision
+    # Precision measures the proportion of positive identifications that were actually correct.
+    # "Out of all the items we labeled as apples, how many were actually apples?"
+    precision = precision_score(y_test, y_pred, average='weighted', zero_division=0)
+    
+    # Generate a detailed classification report
+    # This string contains precision, recall, f1-score for EACH class individually.
+    report = classification_report(y_test, y_pred, target_names=class_names)
+    
+    # Generate a confusion matrix
+    # This matrix shows where the model is making mistakes.
+    # Rows represent actual classes, columns represent predicted classes.
+    conf_matrix = confusion_matrix(y_test, y_pred)
+    
     print(f"  Train accuracy (labeled only): {train_acc:.4f}")
-    print(f"  Test accuracy: {test_acc:.4f}")
+    print(f"  Test Accuracy: {test_acc:.4f}")
+    print(f"  F1 Score: {f1:.4f}")
     
-    # Get detailed report
-    report = clf.get_classification_report(X_test, y_test, class_names)
-    conf_matrix = clf.get_confusion_matrix(X_test, y_test)
-    
+    # Return the trained model and a dictionary containing all the results
     results = {
         'algorithm': algorithm,
         'train_accuracy': train_acc,
         'test_accuracy': test_acc,
+        'f1_score': f1,
+        'recall_score': recall,
+        'precision_score': precision,
         'n_labeled': n_labeled,
         'n_unlabeled': n_unlabeled,
         'classification_report': report,

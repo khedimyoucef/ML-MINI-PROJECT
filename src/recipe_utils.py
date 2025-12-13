@@ -33,13 +33,16 @@ class RecipeRecommender:
         self.df = pd.read_csv(self.data_path)
         
         # Parse the Cleaned_Ingredients column from string to list
-        # We use a safe evaluation since the data is a string representation of a list
+        # The CSV file stores lists as strings (e.g., "['egg', 'milk']").
+        # ast.literal_eval safely converts this string back into a Python list.
+        # We use a lambda function to apply this to every row in the column.
         self.df['parsed_ingredients'] = self.df['Cleaned_Ingredients'].apply(
             lambda x: ast.literal_eval(x) if isinstance(x, str) else []
         )
         
         # We also want a lowercased simplified version for easier matching
-        # This is a basic extraction of words
+        # This is a basic extraction of words to make searching more robust.
+        # For example, "Large Eggs" becomes "large eggs" (and later we match partial words).
         self.df['search_ingredients'] = self.df['parsed_ingredients'].apply(
             lambda ig_list: [self._simplify_ingredient(ig) for ig in ig_list]
         )
@@ -97,21 +100,33 @@ class RecipeRecommender:
                         break 
             
             # Identify missing ingredients
+            # We use set operations to find which ingredients are missing.
+            # all_indices is the set of all ingredient indices in the recipe.
+            # matching_indices is the set of indices we found a match for.
+            # The difference gives us the indices of missing ingredients.
             all_indices = set(range(len(recipe_ingredients)))
             missing_indices = all_indices - matching_indices
             
+            # Retrieve the actual ingredient names for display
+            # We use a list comprehension to get the original ingredient strings
+            # from the 'parsed_ingredients' column using the indices we found.
             missing_ingredients = [row['parsed_ingredients'][i] for i in missing_indices]
             matching_ingredients_display = [row['parsed_ingredients'][i] for i in matching_indices]
             
             match_count = len(matching_indices)
             total_ingredients = len(recipe_ingredients)
             
+            # Avoid division by zero if a recipe has no ingredients (unlikely but good practice)
             if total_ingredients == 0:
                 continue
                 
+            # Calculate match percentage
+            # This is our primary sorting metric.
             match_percentage = match_count / total_ingredients
             
+            # Only include recipes where we have at least one matching ingredient
             if match_count > 0:
+                # Store all the relevant information in a dictionary
                 results.append({
                     'Title': row['Title'],
                     'Instructions': row['Instructions'],
@@ -124,9 +139,16 @@ class RecipeRecommender:
                     'Total_Ingredients': total_ingredients
                 })
         
-        # Sort by match percentage (descending) and then match count
+        # Sort the results
+        # We want the best matches first.
+        # key=lambda x: ... tells Python how to compare two items.
+        # (x['Match_Percentage'], x['Match_Count']) means:
+        # 1. Compare by Match_Percentage first.
+        # 2. If percentages are equal, compare by Match_Count.
+        # reverse=True means we want descending order (highest first).
         results.sort(key=lambda x: (x['Match_Percentage'], x['Match_Count']), reverse=True)
         
+        # Return only the top k results
         return results[:top_k]
 
 if __name__ == "__main__":

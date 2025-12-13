@@ -25,7 +25,14 @@ CLASS_NAMES = [
 ]
 
 # Create mappings
+# We need to convert string class names (like 'apple') to numbers (like 0) because
+# neural networks only understand numbers.
+# enumerate(CLASS_NAMES) gives us pairs like (0, 'bacon'), (1, 'banana'), etc.
+# The dictionary comprehension {name: idx for ...} creates a lookup table.
 CLASS_TO_IDX = {name: idx for idx, name in enumerate(CLASS_NAMES)}
+
+# We also need the reverse mapping to convert the model's numeric predictions
+# back into human-readable names.
 IDX_TO_CLASS = {idx: name for idx, name in enumerate(CLASS_NAMES)}
 
 
@@ -39,9 +46,23 @@ def get_image_transform(image_size: int = 224) -> transforms.Compose:
     Returns:
         Composed transform for image preprocessing
     """
+    # This function defines the standard preprocessing pipeline for images.
+    # It prepares raw images to be fed into our neural network.
     return transforms.Compose([
+        # 1. Resize the image to a fixed size (e.g., 224x224 pixels).
+        # Neural networks require all input images to have the same dimensions.
         transforms.Resize((image_size, image_size)),
+        
+        # 2. Convert the PIL Image or NumPy array to a PyTorch Tensor.
+        # This also scales pixel values from [0, 255] to [0.0, 1.0]
+        # and changes the channel order to (Channels, Height, Width).
         transforms.ToTensor(),
+        
+        # 3. Normalize the color channels.
+        # We subtract the mean and divide by the standard deviation for each channel (R, G, B).
+        # These specific values (mean=[0.485, ...], std=[0.229, ...]) are the standard 
+        # statistics from the ImageNet dataset. Since we are using a model pretrained 
+        # on ImageNet, we must normalize our data in the exact same way.
         transforms.Normalize(
             mean=[0.485, 0.456, 0.406],
             std=[0.229, 0.224, 0.225]
@@ -59,11 +80,31 @@ def get_training_transform(image_size: int = 224) -> transforms.Compose:
     Returns:
         Composed transform for image preprocessing
     """
+    # This function defines the training-specific preprocessing pipeline.
+    # Unlike the standard transform, this includes "Data Augmentation".
+    # Data Augmentation artificially increases the diversity of our training data
+    # by applying random transformations, which helps prevent overfitting.
     return transforms.Compose([
+        # 1. Random Resized Crop:
+        # Randomly crops a portion of the image and resizes it to the target size.
+        # This teaches the model to recognize objects even if they are partially visible
+        # or at different scales.
         transforms.RandomResizedCrop(image_size),
+        
+        # 2. Random Horizontal Flip:
+        # Randomly flips the image horizontally with a 50% probability.
+        # This teaches the model that a banana pointing left is the same as one pointing right.
         transforms.RandomHorizontalFlip(),
+        
+        # 3. Color Jitter:
+        # Randomly changes the brightness, contrast, and saturation of the image.
+        # This teaches the model to be robust to lighting conditions.
         transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4),
+        
+        # 4. Convert to Tensor (same as above)
         transforms.ToTensor(),
+        
+        # 5. Normalize (same as above)
         transforms.Normalize(
             mean=[0.485, 0.456, 0.406],
             std=[0.229, 0.224, 0.225]
@@ -94,6 +135,10 @@ class GroceryDataset(Dataset):
         """
         self.data_dir = Path(data_dir) / split
         self.split = split
+        # We use different transforms for training and testing.
+        # For training, we add augmentation (random crops, flips, color jitter)
+        # to make the model more robust and prevent overfitting.
+        # For testing, we just resize and normalize to keep it standard.
         if transform:
             self.transform = transform
         else:
@@ -101,35 +146,61 @@ class GroceryDataset(Dataset):
         self.max_samples_per_class = max_samples_per_class
         
         self.samples: List[Tuple[str, int]] = []
+        # _load_samples is a "private" helper method (indicated by the underscore prefix).
+        # It populates the self.samples list with all image paths and labels.
         self._load_samples()
     
     def _load_samples(self):
         """Load all image paths and their labels."""
+        # Loop through each class name (e.g., 'apple', 'banana')
         for class_name in CLASS_NAMES:
+            # Construct the path to the class directory
+            # e.g., DS2GROCERIES/train/apple
             class_dir = self.data_dir / class_name
+            
+            # Check if the directory exists to avoid errors
             if not class_dir.exists():
                 continue
             
+            # Find all images in the directory
+            # glob("*.jpg") finds all files ending with .jpg
+            # We combine lists of .jpg and .png files using the + operator
             images = list(class_dir.glob("*.jpg")) + list(class_dir.glob("*.png"))
             
+            # If max_samples_per_class is set (not None), we slice the list
+            # [:n] takes the first n elements. This is useful for quick testing.
             if self.max_samples_per_class:
                 images = images[:self.max_samples_per_class]
             
+            # Add each image to our samples list
             for img_path in images:
+                # We store a tuple: (path_as_string, numeric_label)
+                # str(img_path) converts the Path object to a string
+                # CLASS_TO_IDX[class_name] looks up the number for this class
                 self.samples.append((str(img_path), CLASS_TO_IDX[class_name]))
     
     def __len__(self) -> int:
+        # This magic method allows us to use len(dataset)
+        # It must return the total number of samples.
         return len(self.samples)
     
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
+        # This magic method allows us to access items using dataset[idx]
+        # It retrieves the image and label at the given index.
+        # Unpack the tuple stored in self.samples
         img_path, label = self.samples[idx]
         
-        # Load and convert image
+        # Load the image from disk using PIL (Python Imaging Library)
+        # .convert('RGB') ensures the image has 3 color channels (Red, Green, Blue)
+        # even if it was grayscale or had an alpha channel.
         image = Image.open(img_path).convert('RGB')
-        
+        #this ensures all the data is rgb images
+        # Apply the transformations (resize, normalize, etc.)
+        # This converts the PIL image into a PyTorch Tensor ready for the model.
         if self.transform:
             image = self.transform(image)
         
+        # Return the processed image and its label
         return image, label
     
     def get_paths(self) -> List[str]:
@@ -162,6 +233,8 @@ def create_semi_supervised_split(
         - semi_supervised_labels: Labels with some replaced by -1
         - labeled_indices: Boolean mask of which samples are labeled
     """
+    # 1. Set the random seed for reproducibility.
+    # This ensures that we get the exact same split every time we run the code.
     np.random.seed(random_state)
     n_samples = len(labels)
     n_labeled = int(n_samples * labeled_ratio)
@@ -170,17 +243,24 @@ def create_semi_supervised_split(
     labeled_mask = np.zeros(n_samples, dtype=bool)
     
     # First, select at least one sample per class
+    # This is important! If a class has NO labeled samples, the algorithm
+    # might never learn to recognize it. We want to give it a fighting chance.
     for class_idx in range(len(CLASS_NAMES)):
         class_indices = np.where(labels == class_idx)[0]
         if len(class_indices) > 0:
+            # Randomly select one index from this class
             selected = np.random.choice(class_indices, size=1)
             labeled_mask[selected] = True
     
     # Then fill up to the desired ratio
+    # We find all indices that are not yet labeled
     unlabeled_indices = np.where(~labeled_mask)[0]
+    
+    # Calculate how many more samples we need to reach the target ratio
     n_additional = max(0, n_labeled - labeled_mask.sum())
     
     if n_additional > 0 and len(unlabeled_indices) > 0:
+        # Randomly select additional samples from the unlabeled pool
         additional = np.random.choice(
             unlabeled_indices,
             size=min(n_additional, len(unlabeled_indices)),
@@ -188,8 +268,13 @@ def create_semi_supervised_split(
         )
         labeled_mask[additional] = True
     
-    # Create semi-supervised labels (-1 for unlabeled)
+    # Create semi-supervised labels
+    # We start with a copy of the true labels
     ssl_labels = labels.copy()
+    
+    # Then we "hide" the labels for all samples that are NOT in our labeled mask
+    # We use -1 to represent an "unlabeled" or "unknown" class.
+    # The semi-supervised algorithms will try to predict the true labels for these -1 entries.
     ssl_labels[~labeled_mask] = -1
     
     return ssl_labels, labeled_mask
@@ -213,7 +298,9 @@ def load_image_for_prediction(
     image = Image.open(image_path).convert('RGB')
     image_tensor = transform(image)
     return image_tensor.unsqueeze(0)  # Add batch dimension
-
+    #this operation wraps the single image into a batch of size 1
+    #for example : if we have an image of shape (3, 224, 224) it will be converted to (1, 3, 224, 224) 
+    #[32,3,224,224] for a batch of 32 RGB images of size 224x224
 
 def get_dataset_stats(data_dir: str) -> Dict:
     """

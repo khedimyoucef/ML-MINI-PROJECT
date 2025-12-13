@@ -1,7 +1,7 @@
 """
 Feature Extraction Module
 
-This module uses a pretrained ResNet18 model to extract feature vectors
+This module uses a pretrained ResNet50` model to extract feature vectors
 from grocery images. These features are then used by semi-supervised
 learning algorithms for classification.
 """
@@ -27,7 +27,10 @@ class FeatureExtractor:
     Extracts 2048-dimensional feature vectors from images using
     a pretrained ResNet50 model. Can be fine-tuned on labeled data.
     """
-    
+    #the resnet50 model is designed to extract 2048 features from an image regardless of its size 
+    #for example if we crop the images to 224x224x3 (for rgb images) we get 150528 total features and we only extract 2048 
+    #learnt features 
+    #it applies many convolutional layers and pooling operations that transform and compress the information into 2048 learned features.
     def __init__(self, device: Optional[str] = None, model_path: Optional[str] = None):
         """
         Initialize the feature extractor.
@@ -42,12 +45,23 @@ class FeatureExtractor:
             self.device = torch.device(device)
         
         # Load pretrained ResNet50
+        # We use a ResNet50 model that has been pretrained on the ImageNet dataset.
+        # ImageNet contains 1.2 million images across 1000 categories.
+        # By using this, we leverage the "knowledge" the model has already learned
+        # about detecting edges, textures, and shapes.
         self.model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
         
         # Save feature dim before removing last layer
+        # The last fully connected layer of ResNet50 outputs 1000 class probabilities.
+        # The input to that layer is a vector of size 2048.
+        # We want that 2048-dimensional vector as our "feature".
         self.feature_dim = self.model.fc.in_features  # 2048 for ResNet50
         
         # Remove the final classification layer
+        # We strip off the last layer (fc) so that the model outputs the raw features
+        # instead of class predictions.
+        # list(self.model.children())[:-1] gets all layers except the last one.
+        # nn.Sequential wraps them back into a single module.
         self.model = nn.Sequential(*list(self.model.children())[:-1])
         
         # Load fine-tuned weights if provided
@@ -56,6 +70,8 @@ class FeatureExtractor:
             self.load(model_path)
         
         # Set to evaluation mode by default
+        # This is crucial! It tells PyTorch to behave in "inference" mode.
+        # Layers like Dropout and BatchNorm behave differently during training vs evaluation.
         self.model.eval()
         self.model.to(self.device)
         
@@ -83,8 +99,16 @@ class FeatureExtractor:
             Feature vector as numpy array (512,)
         """
         image_tensor = image_tensor.to(self.device)
+        
+        # Pass the image through the model to get features
         features = self.model(image_tensor)
+        
+        # The output of ResNet50 (without the last layer) is (Batch, 2048, 1, 1).
+        # We use .squeeze() to remove the dimensions of size 1.
+        # Resulting shape: (2048,) for a single image.
         features = features.squeeze()  # Remove spatial dimensions
+        
+        # Move back to CPU and convert to NumPy for compatibility with scikit-learn
         return features.cpu().numpy()
     
     @torch.no_grad()
@@ -105,7 +129,7 @@ class FeatureExtractor:
     def extract_batch(
         self,
         dataset: GroceryDataset,
-        batch_size: int = 32,
+        batch_size: int = 16,
         show_progress: bool = True
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -119,33 +143,50 @@ class FeatureExtractor:
         Returns:
             Tuple of (features, labels) numpy arrays
         """
+        # Create a DataLoader to handle batching
+        # DataLoader is a PyTorch utility that helps us iterate over the dataset in batches.
         dataloader = DataLoader(
             dataset,
             batch_size=batch_size,
-            shuffle=False,
-            num_workers=0  # Avoid multiprocessing issues
+            shuffle=False,  # No need to shuffle for feature extraction
+            num_workers=0  # Use 0 workers (main process) to avoid multiprocessing complexity on Windows
         )
         
         all_features = []
         all_labels = []
         
+        # tqdm creates a progress bar so we can see how fast we are processing
         iterator = tqdm(dataloader, desc="Extracting features") if show_progress else dataloader
         
+        # Iterate through the dataset in batches
         for images, labels in iterator:
+            # Move images to the GPU (if available)
             images = images.to(self.device)
-            features = self.model(images)
-            features = features.squeeze(-1).squeeze(-1)  # Remove spatial dims
             
+            # Forward pass: compute features
+            features = self.model(images)
+            
+            # Remove the extra dimensions (1x1 spatial dims)
+            # .squeeze(-1) removes the last dimension if it has size 1
+            features = features.squeeze(-1).squeeze(-1)
+            
+            # Move features back to CPU and convert to NumPy array
+            # We need to do this because we can't store GPU tensors in a standard list
             all_features.append(features.cpu().numpy())
+            
+            # Also store the labels
             all_labels.append(labels.numpy())
         
+        # Combine all batches into single large arrays
+        # np.vstack stacks arrays vertically (row by row)
+        # np.concatenate joins arrays end-to-end
         return np.vstack(all_features), np.concatenate(all_labels)
     
     def extract_and_cache(
         self,
         dataset: GroceryDataset,
         cache_path: str,
-        batch_size: int = 32,
+        batch_size: int = 16,
         force_recompute: bool = False
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -162,16 +203,22 @@ class FeatureExtractor:
         """
         cache_file = Path(cache_path)
         
+        # Check if we already have cached features on disk
+        # This saves a lot of time by avoiding re-running the heavy model
         if cache_file.exists() and not force_recompute:
             print(f"Loading cached features from {cache_path}")
+            # Load the .npz file (NumPy Zip)
             data = np.load(cache_path)
             return data['features'], data['labels']
         
         print(f"Extracting features (this may take a while)...")
+        # Call the batch extraction method we defined above
         features, labels = self.extract_batch(dataset, batch_size)
         
-        # Save to cache
+        # Save the results to disk for next time
+        # .mkdir(parents=True, exist_ok=True) creates the directory if it doesn't exist
         cache_file.parent.mkdir(parents=True, exist_ok=True)
+        # np.savez compresses the arrays into a single file
         np.savez(cache_path, features=features, labels=labels)
         print(f"Cached features to {cache_path}")
         
@@ -203,17 +250,20 @@ class FeatureExtractor:
         # The current self.model is just the feature extractor (Sequential)
         
         # Create a temporary classification head
+        # This linear layer maps the 2048 features to our 20 grocery classes.
         classifier = nn.Linear(self.feature_dim, num_classes).to(self.device)
         
         # Optimizer
-        # Train both the backbone and the new head, but with different LRs if needed
-        # Here we use same LR for simplicity, but low magnitude
+        # We use Adam, a standard optimizer.
+        # We optimize parameters of BOTH the backbone (self.model) and the new classifier.
+        # This allows the backbone to adapt its features to our specific grocery images.
         
         optimizer = optim.Adam([
             {'params': self.model.parameters()},
             {'params': classifier.parameters()}
         ], lr=learning_rate)
         
+        # CrossEntropyLoss is the standard loss function for multi-class classification.
         criterion = nn.CrossEntropyLoss()
         
         # Training loop
@@ -233,27 +283,37 @@ class FeatureExtractor:
                 optimizer.zero_grad()
                 
                 # Forward pass
+                # 1. Extract features using the backbone (ResNet50)
                 features = self.model(images)
+                # 2. Flatten features to (Batch, 2048)
                 features = features.flatten(1)
+                # 3. Pass features through the classifier to get class scores
                 outputs = classifier(features)
                 
+                # Calculate loss (how wrong was the model?)
                 loss = criterion(outputs, labels)
                 
-                # Backward pass
+                # Backward pass (Backpropagation)
+                # 1. Calculate gradients (how much each parameter contributed to the error)
                 loss.backward()
+                # 2. Update parameters using the optimizer
                 optimizer.step()
                 
-                # Stats
+                # Update statistics for progress bar
                 running_loss += loss.item() * images.size(0)
+                
+                # Get predictions (index of the highest score)
                 _, predicted = outputs.max(1)
                 total += labels.size(0)
                 correct += predicted.eq(labels).sum().item()
                 
+                # Update the progress bar description
                 pbar.set_postfix({
                     'loss': running_loss / total,
                     'acc': correct / total
                 })
             
+            # Calculate average loss and accuracy for the epoch
             train_loss = running_loss / total
             train_acc = correct / total
             
@@ -290,7 +350,7 @@ def extract_dataset_features(
     data_dir: str,
     output_dir: str = "features",
     splits: List[str] = ['train', 'test', 'val'],
-    batch_size: int = 32,
+    batch_size: int = 16,
     max_samples_per_class: Optional[int] = None,
     device: Optional[str] = None
 ) -> dict:

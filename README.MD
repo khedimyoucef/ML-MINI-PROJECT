@@ -6,11 +6,32 @@ A machine learning mini-project that classifies grocery images into 20 categorie
 
 This project demonstrates the power of **semi-supervised learning** for image classification. The system uses only a small fraction of labeled data combined with a larger pool of unlabeled data to train classifiers that can identify grocery items from images.
 
+**Team Members**
+
+- Khedim Youcef
+- Bensetallah Soufiane
+- Zitouni Ahmed
+- Houari Mohamed
+  **group** 1
+  **sepciality** AIDS
+  **Course**: Machine Learning
+
+## Used Datasets
+
+# The Main Dataset Used
+
+https://www.kaggle.com/datasets/liamboyd1/multi-class-food-image-dataset
+
+# The secondary Recipe Dataset Used
+
+https://www.kaggle.com/datasets/pes12017000148/food-ingredients-and-recipe-dataset-with-images
+
 ### Features
+
 - **20 Grocery Categories**: bacon, banana, bread, broccoli, butter, carrots, cheese, chicken, cucumber, eggs, fish, lettuce, milk, onions, peppers, potatoes, sausages, spinach, tomato, yogurt
 - **3 SSL Algorithms**: Label Propagation, Label Spreading, Self-Training
 - **Interactive Web App**: Built with Streamlit for easy image classification
-- **Pretrained Feature Extraction**: Uses ResNet18 for robust image features
+- **Pretrained Feature Extraction**: Uses ResNet50 for robust image features
 
 ## 🚀 Quick Start
 
@@ -52,7 +73,7 @@ ML-MINI-PROJECT/
 ├── src/
 │   ├── __init__.py
 │   ├── data_utils.py       # Data loading utilities
-│   ├── feature_extraction.py  # ResNet18 feature extractor
+│   ├── feature_extraction.py  # ResNet50 feature extractor
 │   ├── semi_supervised.py  # SSL algorithms
 │   └── train.py            # Training pipeline
 ├── models/                 # Saved models
@@ -65,13 +86,17 @@ ML-MINI-PROJECT/
 ## 🔬 Semi-Supervised Learning Algorithms
 
 ### 1. Label Propagation
+
 A graph-based method that spreads labels through a k-nearest neighbors similarity graph. Labels propagate from labeled to unlabeled samples based on feature similarity.
 
 ### 2. Label Spreading
+
 Similar to Label Propagation but uses a normalized graph Laplacian, making it more robust to noise and outliers.
 
 ### 3. Self-Training
+
 An iterative approach that:
+
 1. Trains on labeled data
 2. Predicts on unlabeled data
 3. Adds high-confidence predictions to the training set
@@ -79,11 +104,11 @@ An iterative approach that:
 
 ## 🏗️ Technical Architecture
 
-1. **Feature Extraction**: Pretrained ResNet18 (ImageNet weights) extracts 512-dimensional feature vectors from images
+1. **Feature Extraction**: Pretrained ResNet50 (ImageNet weights) extracts 2048-dimensional feature vectors from images
 2. **Semi-Supervised Classification**: SSL algorithms work on the extracted features to classify images
 
 ```
-Input Image → ResNet18 → 512-D Features → SSL Algorithm → Grocery Category
+Input Image → ResNet50 → 2048-D Features → SSL Algorithm → Grocery Category
 ```
 
 ## 📊 Usage Examples
@@ -127,7 +152,7 @@ The Streamlit app provides:
 - **🏠 Home**: Project overview and quick start guide
 - **🔍 Predict**: Upload images for real-time classification
 - **📊 Dataset Explorer**: Browse dataset categories and statistics
-- **📈 Model Performance**: Compare algorithm accuracies
+- **📈 Model Performance**: Compare algorithm performance metrics
 - **ℹ️ About**: Technical documentation
 
 ## 📝 Requirements

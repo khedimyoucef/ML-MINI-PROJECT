@@ -11,6 +11,7 @@ import argparse
 from pathlib import Path
 import numpy as np
 import json
+import pickle
 from torch.utils.data import Subset, DataLoader
 import torch
 
@@ -68,18 +69,20 @@ def train_models(
     Path(features_dir).mkdir(parents=True, exist_ok=True)
     
     # Print dataset stats
-    print("\n📊 Dataset Statistics:")
+    print("\nDataset Statistics:")
     stats = get_dataset_stats(data_dir)
     for split, split_stats in stats['splits'].items():
         print(f"  {split}: {split_stats['total']} images")
     
     # Load or extract features
-    print("\n🔧 Feature Extraction & Fine-Tuning:")
+    print("\nFeature Extraction & Fine-Tuning:")
     extractor = FeatureExtractor(device=device)
     
     # 1. Prepare Training Data
     print("\n  Preparing training data...")
     # Standard dataset for feature extraction (no augmentation)
+    # We use this to extract features for the UNLABELED data and the TEST data.
+    # We don't want to augment these because we want the model to see the "true" images.
     train_dataset_full = GroceryDataset(
         data_dir, 
         split='train',
@@ -88,6 +91,8 @@ def train_models(
     )
     
     # Augmented dataset for fine-tuning
+    # We use this ONLY for the small set of LABELED data during the fine-tuning phase.
+    # Augmentation helps the model learn robust features from limited data.
     train_dataset_aug = GroceryDataset(
         data_dir, 
         split='train',
@@ -96,9 +101,12 @@ def train_models(
     )
     
     # 2. Create Semi-Supervised Split
+    # This is the crucial part of our experiment!
+    # We artificially hide labels for most of our data to simulate a real-world scenario
+    # where labeling data is expensive and time-consuming.
     # We do this BEFORE feature extraction now, because we need to know
     # which samples are labeled to fine-tune on them.
-    print(f"\n🏷️ Creating semi-supervised split ({labeled_ratio*100:.0f}% labeled)...")
+    print(f"\nCreating semi-supervised split ({labeled_ratio*100:.0f}% labeled)...")
     y_train_full = train_dataset_full.get_labels()
     
     y_train_ssl, labeled_mask = create_semi_supervised_split(
@@ -111,36 +119,47 @@ def train_models(
     print(f"  Unlabeled samples: {n_unlabeled}")
     
     # 3. Fine-Tune on Labeled Data
-    print("\n🎓 Fine-tuning ResNet50 on labeled subset...")
+    # To get the best possible features, we fine-tune the ResNet50 backbone
+    # using ONLY the small set of labeled data we have.
+    # This adapts the general-purpose ImageNet features to our specific grocery domain.
+    print("\nFine-tuning ResNet50 on labeled subset...")
     labeled_indices = np.where(labeled_mask)[0]
     labeled_subset = Subset(train_dataset_aug, labeled_indices)
     
     labeled_loader = DataLoader(
         labeled_subset,
-        batch_size=32,
+        batch_size=16,
         shuffle=True,
         num_workers=0
     )
     
     # Fine-tune the extractor
+    # This updates the weights of the ResNet50 model to better recognize our grocery items.
+    # Even though we only have a few labeled samples, this step significantly improves
+    # the quality of the features we extract later.
     extractor.fine_tune(
         labeled_loader,
-        epochs=10,  # 10 epochs for fine-tuning
-        learning_rate=1e-4
+        epochs=10,  # 10 epochs is usually enough for fine-tuning on small data
+        learning_rate=1e-4  # Low learning rate to avoid destroying pretrained weights
     )
     
     # Save fine-tuned feature extractor
     extractor_path = os.path.join(output_dir, "feature_extractor.pth")
     extractor.save(extractor_path)
-    print(f"  ✓ Saved fine-tuned feature extractor to {extractor_path}")
+    print(f"  Saved fine-tuned feature extractor to {extractor_path}")
     
     # 4. Extract Features (using fine-tuned model)
+    # Now that we have a domain-adapted feature extractor, we convert all our images
+    # (both labeled and unlabeled) into compact feature vectors.
+    # These vectors will be the input for our semi-supervised algorithms.
     print("\n  Extracting features with fine-tuned model...")
     
     # Train features
     train_cache = os.path.join(features_dir, f'train_features_finetuned_{labeled_ratio}.npz')
     # We force recompute because the model has changed (fine-tuned)
-    # and we don't want to load old non-finetuned features
+    # and we don't want to load old non-finetuned features.
+    # This step converts all 100% of our training images (labeled + unlabeled)
+    # into 2048-dimensional vectors.
     X_train, y_train = extractor.extract_and_cache(
         train_dataset_full, 
         train_cache,
@@ -164,40 +183,57 @@ def train_models(
     )
     print(f"  Test features shape: {X_test.shape}")
     
-    # Train and evaluate each algorithm
-    print("\n🤖 Training Semi-Supervised Models:")
+    # 3. Train Semi-Supervised Models
+    print("\nTraining Semi-Supervised Models:")
+    # This dictionary will store the performance metrics for each algorithm we try.
     results = {}
     
+    # Iterate through each algorithm name in our list (e.g., ['label_propagation', ...])
     for algo in algorithms:
         print(f"\n  Training {algo}...")
         try:
+            # train_and_evaluate is our custom function that handles the entire training process
+            # for a single algorithm. It returns the trained model and a dictionary of results.
             clf, result = train_and_evaluate(
-                X_train, y_train_ssl,
-                X_test, y_test,
-                algorithm=algo,
-                class_names=CLASS_NAMES
+                X_train, y_train_ssl,  # Training data (features and semi-supervised labels)
+                X_test, y_test,    # Test data (features and true labels)
+                algorithm=algo,    # Name of the algorithm to use
+                class_names=CLASS_NAMES, # List of class names for reporting
+                # Algorithm-specific parameters:
+                kernel='knn',      # Use k-Nearest Neighbors for graph construction
+                n_neighbors=7,     # Connect each point to its 7 nearest neighbors
+                max_iter=1000      # Maximum number of iterations for the algorithm to converge
             )
             
-            # Save the model
-            model_path = os.path.join(output_dir, f"{algo}_model.joblib")
-            clf.save(model_path)
-            print(f"  ✓ Saved model to {model_path}")
+            # Save the trained model to disk using Python's pickle module
+            # This allows us to load and use the model later without retraining.
+            model_path = os.path.join(output_dir, f'{algo}_model.pkl')
+            with open(model_path, 'wb') as f:
+                pickle.dump(clf, f)
+            print(f"  Saved model to {model_path}")
             
+            # Store the results in our main dictionary
+            # We convert numpy types to standard Python types (float, int) 
+            # so that they can be saved to JSON later.
             results[algo] = {
                 'train_accuracy': float(result['train_accuracy']),
                 'test_accuracy': float(result['test_accuracy']),
+                'f1_score': float(result['f1_score']),
+                'recall_score': float(result['recall_score']),
+                'precision_score': float(result['precision_score']),
                 'n_labeled': int(result['n_labeled']),
                 'n_unlabeled': int(result['n_unlabeled'])
             }
             
         except Exception as e:
-            print(f"  ✗ Error training {algo}: {e}")
+            print(f"  Error training {algo}: {e}")
             results[algo] = {'error': str(e)}
     
     # Save training results
     results_path = os.path.join(output_dir, 'training_results.json')
     
-    # Add metadata
+    # 4. Save Results
+    # We add some metadata to the results so we remember how this experiment was run.
     results['metadata'] = {
         'labeled_ratio': labeled_ratio,
         'n_train_samples': len(X_train),
@@ -207,24 +243,32 @@ def train_models(
         'class_names': CLASS_NAMES
     }
     
+    # Save the results dictionary to a JSON file.
+    # JSON is a standard text-based format for storing data structures.
+    results_path = os.path.join(output_dir, 'training_results.json')
     with open(results_path, 'w') as f:
         json.dump(results, f, indent=2)
-    print(f"\n📝 Saved training results to {results_path}")
     
-    # Print summary
-    print("\n" + "=" * 60)
-    print("📈 Training Summary:")
-    print("-" * 60)
-    print(f"{'Algorithm':<20} {'Train Acc':>12} {'Test Acc':>12}")
-    print("-" * 60)
+    print(f"\nSaved training results to {results_path}")
+    
+    # Print a nice summary table to the console
+    print("\n" + "=" * 80)
+    print("Training Summary:")
+    print("-" * 80)
+    print(f"{'Algorithm':<20} {'Train Acc':>10} {'Test Acc':>10} {'F1 Score':>10} {'Recall':>10} {'Precision':>10}")
+    print("-" * 80)
     
     for algo in algorithms:
         if 'error' not in results.get(algo, {}):
             train_acc = results[algo]['train_accuracy']
             test_acc = results[algo]['test_accuracy']
-            print(f"{algo:<20} {train_acc:>11.2%} {test_acc:>11.2%}")
+            f1 = results[algo].get('f1_score', 0)
+            recall = results[algo].get('recall_score', 0)
+            precision = results[algo].get('precision_score', 0)
+            
+            print(f"{algo:<20} {train_acc:>9.2%} {test_acc:>9.2%} {f1:>9.2f} {recall:>9.2f} {precision:>9.2f}")
         else:
-            print(f"{algo:<20} {'ERROR':>12} {'ERROR':>12}")
+            print(f"{algo:<20} {'ERROR':>10} {'ERROR':>10} {'ERROR':>10} {'ERROR':>10} {'ERROR':>10}")
     
     print("=" * 60)
     

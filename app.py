@@ -202,7 +202,9 @@ st.markdown("""
 # ============================================================================
 # Session State Initialization
 # ============================================================================
-
+# We use session state to persist data across reruns, which is essential
+# for keeping the loaded models and feature extractor in memory.
+# This avoids reloading heavy models every time the user interacts with the app.
 if 'feature_extractor' not in st.session_state:
     st.session_state.feature_extractor = None
     
@@ -225,7 +227,12 @@ if 'grocery_list' not in st.session_state:
 
 @st.cache_resource
 def load_feature_extractor():
-    """Load the feature extractor (cached)."""
+    """
+    Load the feature extractor (cached).
+    
+    We use @st.cache_resource to ensure this heavy object is loaded only once.
+    It's shared across all users and sessions, saving memory and time.
+    """
     model_path = "models/feature_extractor.pth"
     if os.path.exists(model_path):
         return FeatureExtractor(model_path=model_path)
@@ -268,6 +275,8 @@ def get_available_models():
 def predict_image(image: Image.Image, model_name: str):
     """Make prediction on an uploaded image."""
     # Load feature extractor
+    # We need to extract features from the uploaded image before we can classify it.
+    # The extractor converts the raw pixels into a meaningful vector representation.
     if st.session_state.feature_extractor is None:
         st.session_state.feature_extractor = load_feature_extractor()
     
@@ -357,11 +366,11 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     
     st.markdown("---")
-    st.markdown("""
-    <div class="footer">
-        Made with ❤️ for ML Mini-Project
-    </div>
-    """, unsafe_allow_html=True)
+    # st.markdown("""
+    # <div class="footer">
+    #     Made with ❤️ for ML Mini-Project
+    # </div>
+    # """, unsafe_allow_html=True)
 
 
 # ============================================================================
@@ -770,27 +779,32 @@ elif page == "📈 Model Performance":
                 algo_data.append({
                     'Algorithm': algo.replace('_', ' ').title(),
                     'Train Accuracy': results[algo]['train_accuracy'] * 100,
-                    'Test Accuracy': results[algo]['test_accuracy'] * 100
+                    'Test Accuracy': results[algo]['test_accuracy'] * 100,
+                    'F1 Score': results[algo].get('f1_score', 0) * 100,
+                    'Recall': results[algo].get('recall_score', 0) * 100,
+                    'Precision': results[algo].get('precision_score', 0) * 100
                 })
         
         if algo_data:
-            fig = go.Figure()
+            # Accuracy Chart
+            st.markdown("#### 🎯 Accuracy")
+            fig_acc = go.Figure()
             
-            fig.add_trace(go.Bar(
+            fig_acc.add_trace(go.Bar(
                 name='Train Accuracy',
                 x=[d['Algorithm'] for d in algo_data],
                 y=[d['Train Accuracy'] for d in algo_data],
                 marker_color='#7c3aed'
             ))
             
-            fig.add_trace(go.Bar(
+            fig_acc.add_trace(go.Bar(
                 name='Test Accuracy',
                 x=[d['Algorithm'] for d in algo_data],
                 y=[d['Test Accuracy'] for d in algo_data],
                 marker_color='#00d4ff'
             ))
             
-            fig.update_layout(
+            fig_acc.update_layout(
                 barmode='group',
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
@@ -798,15 +812,63 @@ elif page == "📈 Model Performance":
                 yaxis=dict(
                     title='Accuracy (%)',
                     showgrid=True,
-                    gridcolor='rgba(255,255,255,0.1)',
-                    range=[0, 100]
+                    gridcolor='rgba(255,255,255,0.1)'
                 ),
-                xaxis=dict(showgrid=False),
-                legend=dict(font=dict(color='white')),
-                height=400
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1
+                )
             )
+            st.plotly_chart(fig_acc, use_container_width=True)
             
-            st.plotly_chart(fig, use_container_width=True)
+            # Detailed Metrics Chart
+            st.markdown("#### 📏 Detailed Metrics (F1, Recall, Precision)")
+            fig_metrics = go.Figure()
+            
+            fig_metrics.add_trace(go.Bar(
+                name='F1 Score',
+                x=[d['Algorithm'] for d in algo_data],
+                y=[d['F1 Score'] for d in algo_data],
+                marker_color='#f97316'
+            ))
+            
+            fig_metrics.add_trace(go.Bar(
+                name='Recall',
+                x=[d['Algorithm'] for d in algo_data],
+                y=[d['Recall'] for d in algo_data],
+                marker_color='#10b981'
+            ))
+            
+            fig_metrics.add_trace(go.Bar(
+                name='Precision',
+                x=[d['Algorithm'] for d in algo_data],
+                y=[d['Precision'] for d in algo_data],
+                marker_color='#ec4899'
+            ))
+            
+            fig_metrics.update_layout(
+                barmode='group',
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='white'),
+                yaxis=dict(
+                    title='Score (%)',
+                    showgrid=True,
+                    gridcolor='rgba(255,255,255,0.1)'
+                ),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1
+                )
+            )
+            st.plotly_chart(fig_metrics, use_container_width=True)
+
             
             # Detailed cards
             st.markdown("### 📋 Detailed Results")
@@ -983,8 +1045,8 @@ elif page == "ℹ️ About":
                 The system uses a two-stage approach:
             </p>
             <ol style="color: #94a3b8;">
-                <li><strong>Feature Extraction:</strong> Pre-trained ResNet18 extracts 
-                    512-dimensional feature vectors from images</li>
+                <li><strong>Feature Extraction:</strong> Pre-trained ResNet50 extracts 
+                    2048-dimensional feature vectors from images</li>
                 <li><strong>Semi-Supervised Classification:</strong> SSL algorithms 
                     classify based on extracted features</li>
             </ol>
