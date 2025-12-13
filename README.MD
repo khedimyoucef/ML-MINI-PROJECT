@@ -12,9 +12,9 @@ This project demonstrates the power of **semi-supervised learning** for image cl
 - Bensetallah Soufiane
 - Zitouni Ahmed
 - Houari Mohamed
-  **group** 1
-  **sepciality** AIDS
-  **Course**: Machine Learning
+- **group** 1
+- **sepciality** Artificial Intelligence and DataScience
+- **Course**: Machine Learning
 
 ## Used Datasets
 
@@ -66,25 +66,30 @@ The app will open in your browser at `http://localhost:8501`
 
 ```
 ML-MINI-PROJECT/
-|DS3RECIPES/
-|   ├──Food Images/
-|   ├──Food Ingredients and Recipe Dataset with Image Name Mapping.csv
-|
-├── DS2GROCERIES/           # Dataset
-│   ├── train/              # Training images
+├── DS2GROCERIES/           # Main grocery dataset
+│   ├── train/              # Training images (20 categories)
 │   ├── test/               # Test images
 │   └── val/                # Validation images
-├── src/
+├── DS3RECIPES/             # Recipe dataset
+│   ├── Food Images/        # Recipe images
+│   └── Food Ingredients and Recipe Dataset with Image Name Mapping.csv
+├── src/                    # Source code
 │   ├── __init__.py
-│   ├── data_utils.py       # Data loading utilities
+│   ├── data_utils.py       # Data loading and preprocessing utilities
 │   ├── feature_extraction.py  # ResNet50 feature extractor
-│   ├── semi_supervised.py  # SSL algorithms
+│   ├── recipe_utils.py     # Recipe search utilities
+│   ├── semi_supervised.py  # SSL algorithms implementation
 │   └── train.py            # Training pipeline
-├── models/                 # Saved models
-├── features/               # Cached feature vectors
+├── models/                 # Saved trained models (.pkl files)
+├── features/               # Cached feature vectors (.npz files)
+├── OnlineTestImages/       # Test images for online prediction
+├── SCREENSHOTS/            # Application screenshots
 ├── app.py                  # Streamlit web application
 ├── requirements.txt        # Python dependencies
-└── README.MD
+├── README.MD               # This file
+├── problem-statement.pdf   # Project requirements
+├── FinalReport.pdf         # Project report
+└── .gitignore
 ```
 
 ## 🔬 Semi-Supervised Learning Algorithms
