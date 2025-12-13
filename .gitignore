@@ -8,3 +8,4 @@ models_test/
 OnlineTestImages/
 SCREENSHOTS/
 DS3RECIPES/
+__pycache__
