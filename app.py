@@ -24,6 +24,22 @@ from src.data_utils import CLASS_NAMES, IDX_TO_CLASS, get_dataset_stats
 from src.feature_extraction import FeatureExtractor
 from src.semi_supervised import SemiSupervisedClassifier
 from src.recipe_utils import RecipeRecommender
+from src.hf_utils import ensure_models_available
+
+
+# ============================================================================
+# Initialize: Download from Hugging Face if needed
+# ============================================================================
+# This runs once when the app starts. It checks if required files exist locally,
+# and downloads them from Hugging Face if they're missing.
+# This is essential for deployed apps where the files aren't in the repository.
+# NOTE: We use print() instead of st.warning() because Streamlit isn't ready yet.
+
+try:
+    ensure_models_available()
+except Exception as e:
+    print(f"Warning: Could not download from Hugging Face: {e}")
+    print("The app will use locally available files if any exist.")
 
 
 # ============================================================================

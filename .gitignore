@@ -9,3 +9,7 @@ OnlineTestImages/
 SCREENSHOTS/
 DS3RECIPES/
 __pycache__
+
+# Security: Never commit tokens or secrets
+src/token.txt
+.streamlit/secrets.toml
