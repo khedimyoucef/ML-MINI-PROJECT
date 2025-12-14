@@ -13,4 +13,4 @@ __pycache__
 # Security: Never commit tokens or secrets
 src/token.txt
 .streamlit/secrets.
-.streamlit
+.streamlit/
