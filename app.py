@@ -24,26 +24,10 @@ from src.data_utils import CLASS_NAMES, IDX_TO_CLASS, get_dataset_stats
 from src.feature_extraction import FeatureExtractor
 from src.semi_supervised import SemiSupervisedClassifier
 from src.recipe_utils import RecipeRecommender
-from src.hf_utils import ensure_models_available
 
 
 # ============================================================================
-# Initialize: Download from Hugging Face if needed
-# ============================================================================
-# This runs once when the app starts. It checks if required files exist locally,
-# and downloads them from Hugging Face if they're missing.
-# This is essential for deployed apps where the files aren't in the repository.
-# NOTE: We use print() instead of st.warning() because Streamlit isn't ready yet.
-
-try:
-    ensure_models_available()
-except Exception as e:
-    print(f"Warning: Could not download from Hugging Face: {e}")
-    print("The app will use locally available files if any exist.")
-
-
-# ============================================================================
-# Page Configuration
+# Page Configuration (MUST BE FIRST STREAMLIT COMMAND)
 # ============================================================================
 
 st.set_page_config(
@@ -52,6 +36,29 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+
+# ============================================================================
+# Initialize: Download from Hugging Face if needed
+# ============================================================================
+
+@st.cache_resource
+def init_hf_download():
+    """Download required files from HF if missing (runs once, cached)"""
+    try:
+        from src.hf_utils import ensure_models_available
+        success = ensure_models_available()
+        if not success:
+            st.warning("⚠️ Some files could not be downloaded from Hugging Face")
+            st.info("💡 Some features may not work. Check logs for details.")
+        return success
+    except Exception as e:
+        st.error(f"❌ Error during initialization: {e}")
+        st.info("The app will try to use locally available files.")
+        return False
+
+# Initialize (this will be cached after first run)
+init_hf_download()
 
 # ============================================================================
 # Custom CSS for Premium Design
