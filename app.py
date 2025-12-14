@@ -265,7 +265,9 @@ def load_feature_extractor():
 @st.cache_resource
 def load_model(model_path: str):
     """Load a trained model (cached)."""
-    return SemiSupervisedClassifier.load(model_path)
+    import pickle
+    with open(model_path, 'rb') as f:
+        return pickle.load(f)
 
 
 def load_training_results():
@@ -292,7 +294,7 @@ def get_available_models():
     if not models_dir.exists():
         return []
     
-    return [f.stem.replace("_model", "") for f in models_dir.glob("*_model.joblib")]
+    return [f.stem.replace("_model", "") for f in models_dir.glob("*_model.pkl")]
 
 
 def predict_image(image: Image.Image, model_name: str):
@@ -307,7 +309,7 @@ def predict_image(image: Image.Image, model_name: str):
     
     # Load model
     if model_name not in st.session_state.models:
-        model_path = f"models/{model_name}_model.joblib"
+        model_path = f"models/{model_name}_model.pkl"
         st.session_state.models[model_name] = load_model(model_path)
     
     model = st.session_state.models[model_name]
