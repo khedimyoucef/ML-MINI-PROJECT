@@ -9,8 +9,10 @@ OnlineTestImages/
 SCREENSHOTS/
 DS3RECIPES/
 __pycache__
-
+Livrables/PRESENTATION_GUIDE.pdf
+Livrables/PRESENTATION_GUIDE.md
 # Security: Never commit tokens or secrets
 src/token.txt
 .streamlit/secrets.
 .streamlit/
+pdf_content.txt

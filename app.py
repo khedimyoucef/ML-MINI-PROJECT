@@ -24,6 +24,7 @@ from src.data_utils import CLASS_NAMES, IDX_TO_CLASS, get_dataset_stats
 from src.feature_extraction import FeatureExtractor
 from src.semi_supervised import SemiSupervisedClassifier
 from src.recipe_utils import RecipeRecommender
+from src.nutrition_data import get_nutrition_html_card, get_nutrition
 
 
 # ============================================================================
@@ -515,7 +516,7 @@ elif page == "🔍 Predict":
             
             if uploaded_file is not None:
                 image = Image.open(uploaded_file).convert('RGB')
-                st.image(image, caption="Uploaded Image", use_container_width=True)
+                st.image(image, caption="Uploaded Image", width="stretch")
         
         with col2:
             st.markdown("### 🎯 Prediction Results")
@@ -572,18 +573,23 @@ elif page == "🔍 Predict":
                             
                             st.plotly_chart(fig, use_container_width=True)
                             
-                            # Add to grocery list
-                            # Check if item already exists to avoid duplicates (optional, but good UX)
-                            # We allow duplicates if user wants to add multiple items, but maybe unique is better?
-                            # Let's just append for now as requested "fill after each image prediction"
+                            # Display Nutrition Facts
+                            st.markdown("#### 🥗 Nutrition Facts (per 100g)")
+                            nutrition_html = get_nutrition_html_card(predicted_class)
+                            st.markdown(nutrition_html, unsafe_allow_html=True)
                             
+                            # Add to grocery list
                             # Store a thumbnail for the list
                             thumb = image.copy()
                             thumb.thumbnail((100, 100))
                             
+                            # Get nutrition info for the list
+                            nutrition = get_nutrition(predicted_class)
+                            
                             st.session_state.grocery_list.append({
                                 'name': predicted_class,
-                                'image': thumb
+                                'image': thumb,
+                                'calories': nutrition['calories'] if nutrition else 0
                             })
                             st.toast(f"Added {predicted_class} to your grocery list!", icon="🛒")
                             
@@ -611,7 +617,7 @@ elif page == "🔍 Predict":
             for i, item in enumerate(st.session_state.grocery_list):
                 col_idx = i % 6
                 with cols[col_idx]:
-                    st.image(item['image'], caption=item['name'].title(), use_container_width=True)
+                    st.image(item['image'], caption=item['name'].title(), width="stretch")
         else:
             st.info("Your grocery list is empty. Predict items to add them here!")
 
@@ -730,7 +736,7 @@ elif page == "📊 Dataset Explorer":
             for i, img_path in enumerate(sample_images):
                 with cols[i]:
                     img = Image.open(img_path)
-                    st.image(img, caption=f"Sample {i+1}", use_container_width=True)
+                    st.image(img, caption=f"Sample {i+1}", width="stretch")
         else:
             st.info("No sample images found for this category.")
 
@@ -991,7 +997,7 @@ elif page == "🍳 Recipe Recommender":
                                 img_path = Path("DS3RECIPES/Food Images/Food Images") / f"{img_name}.jpg"
                                 
                                 if img_path.exists():
-                                    st.image(str(img_path), use_container_width=True)
+                                    st.image(str(img_path), width="stretch")
                                 else:
                                     st.markdown("📷 No image available")
                                     
