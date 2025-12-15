@@ -20,7 +20,7 @@ This project demonstrates the power of **semi-supervised learning** for image cl
 
 # deployed app url
 
-- https://ml-mini-project-khedim-youcef.streamlit.app/
+- https://ml-mini-project-4tlzmet4x5wzard2dsp9fw.streamlit.app/
 
 # Note that :
 
