@@ -571,7 +571,7 @@ elif page == "🔍 Predict":
                                 margin=dict(l=0, r=0, t=0, b=0)
                             )
                             
-                            st.plotly_chart(fig, use_container_width=True)
+                            st.plotly_chart(fig, width='stretch')
                             
                             # Display Nutrition Facts
                             st.markdown("#### 🥗 Nutrition Facts (per 100g)")
@@ -685,7 +685,7 @@ elif page == "📊 Dataset Explorer":
                 font=dict(color='white'),
                 legend=dict(font=dict(color='white'))
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
         # Class distribution
         st.markdown("### 📊 Images per Category (Training Set)")
@@ -718,7 +718,7 @@ elif page == "📊 Dataset Explorer":
                 height=400
             )
             
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
         # Sample images viewer
         st.markdown("### 🖼️ Sample Images")
@@ -853,7 +853,7 @@ elif page == "📈 Model Performance":
                     x=1
                 )
             )
-            st.plotly_chart(fig_acc, use_container_width=True)
+            st.plotly_chart(fig_acc, width='stretch')
             
             # Detailed Metrics Chart
             st.markdown("#### 📏 Detailed Metrics (F1, Recall, Precision)")
@@ -898,7 +898,7 @@ elif page == "📈 Model Performance":
                     x=1
                 )
             )
-            st.plotly_chart(fig_metrics, use_container_width=True)
+            st.plotly_chart(fig_metrics, width='stretch')
 
             
             # Detailed cards
@@ -1091,26 +1091,26 @@ elif page == "ℹ️ About":
         """, unsafe_allow_html=True)
     
     st.markdown("""
-    <div class="glass-card">
-        <h3>📚 How to Use</h3>
-        <div style="color: #94a3b8;">
-            <h4>1. Install Dependencies</h4>
-            <code style="background: rgba(0,0,0,0.3); padding: 0.5rem 1rem; border-radius: 8px; display: block; margin: 0.5rem 0;">
-                pip install -r requirements.txt
-            </code>
-            
-            <h4>2. Train Models</h4>
-            <code style="background: rgba(0,0,0,0.3); padding: 0.5rem 1rem; border-radius: 8px; display: block; margin: 0.5rem 0;">
-                python src/train.py --labeled-ratio 0.1
-            </code>
-            
-            <h4>3. Run the Application</h4>
-            <code style="background: rgba(0,0,0,0.3); padding: 0.5rem 1rem; border-radius: 8px; display: block; margin: 0.5rem 0;">
-                streamlit run app.py
-            </code>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+<div class="glass-card">
+<h3>📚 How to Use</h3>
+<div style="color: #94a3b8;">
+<h4>1. Install Dependencies</h4>
+<code style="background: rgba(0,0,0,0.3); padding: 0.5rem 1rem; border-radius: 8px; display: block; margin: 0.5rem 0;">
+pip install -r requirements.txt
+</code>
+
+<h4>2. Train Models</h4>
+<code style="background: rgba(0,0,0,0.3); padding: 0.5rem 1rem; border-radius: 8px; display: block; margin: 0.5rem 0;">
+python src/train.py --labeled-ratio 0.1
+</code>
+
+<h4>3. Run the Application</h4>
+<code style="background: rgba(0,0,0,0.3); padding: 0.5rem 1rem; border-radius: 8px; display: block; margin: 0.5rem 0;">
+streamlit run app.py
+</code>
+</div>
+</div>
+""", unsafe_allow_html=True)
     
     st.markdown("""
     <div class="footer" style="margin-top: 2rem;">
