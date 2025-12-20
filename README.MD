@@ -183,6 +183,21 @@ The Streamlit app provides:
 - Streamlit 1.28+
 - See `requirements.txt` for full list
 
+## 🖥️ Hardware Support
+
+### AMD GPUs (Windows)
+
+This project supports AMD GPUs on Windows via **DirectML**.
+
+1. Ensure you have a DirectX 12 capable GPU.
+2. The code will automatically detect if CUDA (NVIDIA) is unavailable and attempt to use DirectML.
+3. You should see "Using DirectML device (AMD GPU)" in the console when training starts.
+
+To manually verify or install:
+```bash
+pip install torch-directml
+```
+
 ## 📄 License
 
 This project is for educational purposes (ML Mini-Project).

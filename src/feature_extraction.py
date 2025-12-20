@@ -40,9 +40,20 @@ class FeatureExtractor:
             model_path: Optional path to load fine-tuned weights from
         """
         if device is None:
-            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            if torch.cuda.is_available():
+                self.device = torch.device('cuda')
+                print("Using CUDA device")
+            else:
+                try:
+                    import torch_directml
+                    self.device = torch_directml.device()
+                    print("Using DirectML device (AMD GPU)")
+                except ImportError:
+                    self.device = torch.device('cpu')
+                    print("Using CPU device")
         else:
             self.device = torch.device(device)
+            print(f"Using specified device: {device}")
         
         # Load pretrained ResNet50
         # We use a ResNet50 model that has been pretrained on the ImageNet dataset.

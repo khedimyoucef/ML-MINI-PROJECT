@@ -271,6 +271,7 @@ def train_and_evaluate(
     y_test: np.ndarray,
     algorithm: str,
     class_names: Optional[list] = None,
+    y_train_true: Optional[np.ndarray] = None,
     **kwargs
 ) -> Tuple[SemiSupervisedClassifier, Dict[str, Any]]:
     """
@@ -283,6 +284,10 @@ def train_and_evaluate(
         y_test: Test labels
         algorithm: Algorithm name
         class_names: Class names for reporting
+        y_test: Test labels
+        algorithm: Algorithm name
+        class_names: Class names for reporting
+        y_train_true: Optional ground truth labels for ALL training samples (for evaluation only)
         **kwargs: Algorithm-specific parameters
         
     Returns:
@@ -303,6 +308,12 @@ def train_and_evaluate(
     # Calculate comprehensive metrics
     # We use 'weighted' average to account for class imbalance, which is common in real-world datasets
     train_acc = clf.score(X_train[y_train != -1], y_train[y_train != -1])
+    
+    # Calculate accuracy on FULL training set if ground truth is provided
+    train_acc_full = None
+    if y_train_true is not None:
+        train_acc_full = clf.score(X_train, y_train_true)
+        
     test_acc = clf.score(X_test, y_test)
     
     # Get predictions for detailed metrics
@@ -334,6 +345,8 @@ def train_and_evaluate(
     conf_matrix = confusion_matrix(y_test, y_pred)
     
     print(f"  Train accuracy (labeled only): {train_acc:.4f}")
+    if train_acc_full is not None:
+        print(f"  Train accuracy (full dataset): {train_acc_full:.4f}")
     print(f"  Test Accuracy: {test_acc:.4f}")
     print(f"  F1 Score: {f1:.4f}")
     
@@ -341,6 +354,7 @@ def train_and_evaluate(
     results = {
         'algorithm': algorithm,
         'train_accuracy': train_acc,
+        'train_accuracy_full': train_acc_full,
         'test_accuracy': test_acc,
         'f1_score': f1,
         'recall_score': recall,
@@ -359,7 +373,8 @@ def compare_algorithms(
     y_train_ssl: np.ndarray,
     X_test: np.ndarray,
     y_test: np.ndarray,
-    class_names: Optional[list] = None
+    class_names: Optional[list] = None,
+    y_train_true: Optional[np.ndarray] = None
 ) -> Dict[str, Dict[str, Any]]:
     """
     Compare all semi-supervised algorithms.
@@ -381,7 +396,8 @@ def compare_algorithms(
             clf, result = train_and_evaluate(
                 X_train, y_train_ssl, X_test, y_test,
                 algorithm=algorithm,
-                class_names=class_names
+                class_names=class_names,
+                y_train_true=y_train_true
             )
             results[algorithm] = result
             results[algorithm]['classifier'] = clf

@@ -55,7 +55,7 @@ def train_models(
         labeled_ratio: Fraction of labeled data
         max_samples_per_class: Limit samples per class (for testing)
         algorithms: List of algorithms to train
-        device: Device for feature extraction
+        device: Device for feature extraction (cuda/cpu/dml)
     """
     print("=" * 60)
     print("Semi-Supervised Grocery Classification Training")
@@ -199,6 +199,7 @@ def train_models(
                 X_test, y_test,    # Test data (features and true labels)
                 algorithm=algo,    # Name of the algorithm to use
                 class_names=CLASS_NAMES, # List of class names for reporting
+                y_train_true=y_train, # Pass ground truth for full training accuracy
                 # Algorithm-specific parameters:
                 kernel='knn',      # Use k-Nearest Neighbors for graph construction
                 n_neighbors=7,     # Connect each point to its 7 nearest neighbors
@@ -217,6 +218,7 @@ def train_models(
             # so that they can be saved to JSON later.
             results[algo] = {
                 'train_accuracy': float(result['train_accuracy']),
+                'train_accuracy_full': float(result['train_accuracy_full']) if result['train_accuracy_full'] is not None else None,
                 'test_accuracy': float(result['test_accuracy']),
                 'f1_score': float(result['f1_score']),
                 'recall_score': float(result['recall_score']),
@@ -255,20 +257,23 @@ def train_models(
     print("\n" + "=" * 80)
     print("Training Summary:")
     print("-" * 80)
-    print(f"{'Algorithm':<20} {'Train Acc':>10} {'Test Acc':>10} {'F1 Score':>10} {'Recall':>10} {'Precision':>10}")
-    print("-" * 80)
+    print(f"{'Algorithm':<20} {'Labeled Acc':>12} {'Full Train Acc':>15} {'Test Acc':>10} {'F1 Score':>10} {'Recall':>10} {'Precision':>10}")
+    print("-" * 100)
     
     for algo in algorithms:
         if 'error' not in results.get(algo, {}):
             train_acc = results[algo]['train_accuracy']
+            train_acc_full = results[algo].get('train_accuracy_full', 0)
             test_acc = results[algo]['test_accuracy']
             f1 = results[algo].get('f1_score', 0)
             recall = results[algo].get('recall_score', 0)
             precision = results[algo].get('precision_score', 0)
             
-            print(f"{algo:<20} {train_acc:>9.2%} {test_acc:>9.2%} {f1:>9.2f} {recall:>9.2f} {precision:>9.2f}")
+            full_acc_str = f"{train_acc_full:>14.2%}" if train_acc_full is not None else "N/A"
+            
+            print(f"{algo:<20} {train_acc:>11.2%} {full_acc_str} {test_acc:>9.2%} {f1:>9.2f} {recall:>9.2f} {precision:>9.2f}")
         else:
-            print(f"{algo:<20} {'ERROR':>10} {'ERROR':>10} {'ERROR':>10} {'ERROR':>10} {'ERROR':>10}")
+            print(f"{algo:<20} {'ERROR':>12} {'ERROR':>15} {'ERROR':>10} {'ERROR':>10} {'ERROR':>10} {'ERROR':>10}")
     
     print("=" * 60)
     
