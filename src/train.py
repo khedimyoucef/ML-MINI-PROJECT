@@ -139,8 +139,8 @@ def train_models(
     # the quality of the features we extract later.
     extractor.fine_tune(
         labeled_loader,
-        epochs=20,  # Increased from 10 for better feature learning
-        learning_rate=5e-5  # Lower LR for more stable fine-tuning
+        epochs=10,  # Reduced to prevent overfitting on smaller dataset
+        learning_rate=1e-4  # Standard learning rate
     )
     
     # Save fine-tuned feature extractor
