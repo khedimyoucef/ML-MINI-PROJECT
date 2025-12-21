@@ -72,7 +72,7 @@ def get_image_transform(image_size: int = 224) -> transforms.Compose:
 
 def get_training_transform(image_size: int = 224) -> transforms.Compose:
     """
-    Get the training image preprocessing transform with augmentation.
+    Get the training image preprocessing transform with STRONG augmentation.
     
     Args:
         image_size: Target size for images
@@ -85,26 +85,37 @@ def get_training_transform(image_size: int = 224) -> transforms.Compose:
     # Data Augmentation artificially increases the diversity of our training data
     # by applying random transformations, which helps prevent overfitting.
     return transforms.Compose([
-        # 1. Random Resized Crop:
-        # Randomly crops a portion of the image and resizes it to the target size.
-        # This teaches the model to recognize objects even if they are partially visible
-        # or at different scales.
-        transforms.RandomResizedCrop(image_size),
+        # 1. Random Resized Crop with more aggressive scale range:
+        # Randomly crops a portion of the image (70-100% of area) and resizes it.
+        # This teaches the model to recognize objects even if they are partially visible.
+        transforms.RandomResizedCrop(image_size, scale=(0.7, 1.0)),
         
         # 2. Random Horizontal Flip:
         # Randomly flips the image horizontally with a 50% probability.
-        # This teaches the model that a banana pointing left is the same as one pointing right.
         transforms.RandomHorizontalFlip(),
         
-        # 3. Color Jitter:
-        # Randomly changes the brightness, contrast, and saturation of the image.
-        # This teaches the model to be robust to lighting conditions.
-        transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4),
+        # 3. Random Rotation:
+        # Slightly rotates the image to handle different camera angles.
+        transforms.RandomRotation(15),
         
-        # 4. Convert to Tensor (same as above)
+        # 4. Color Jitter (enhanced with hue):
+        # Randomly changes brightness, contrast, saturation, AND hue.
+        # This teaches the model to be robust to various lighting conditions.
+        transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1),
+        
+        # 5. Random Grayscale:
+        # Occasionally converts to grayscale (10% of the time).
+        # This helps the model focus on shapes rather than just colors.
+        transforms.RandomGrayscale(p=0.1),
+        
+        # 6. Gaussian Blur (optional, for robustness to blur):
+        # Applies slight blur to make model robust to image quality variations.
+        transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 0.5)),
+        
+        # 7. Convert to Tensor
         transforms.ToTensor(),
         
-        # 5. Normalize (same as above)
+        # 8. Normalize with ImageNet statistics
         transforms.Normalize(
             mean=[0.485, 0.456, 0.406],
             std=[0.229, 0.224, 0.225]

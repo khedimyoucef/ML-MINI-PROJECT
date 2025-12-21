@@ -87,12 +87,14 @@ ML-MINI-PROJECT/
 ├── src/                    # Source code
 │   ├── __init__.py
 │   ├── data_utils.py       # Data loading and preprocessing utilities
+│   ├── dataset_cleaner.py  # Dataset cleaning and validation tool
 │   ├── feature_extraction.py  # ResNet50 feature extractor
 │   ├── recipe_utils.py     # Recipe search utilities
 │   ├── semi_supervised.py  # SSL algorithms implementation
 │   └── train.py            # Training pipeline
 ├── models/                 # Saved trained models (.pkl files)
 ├── features/               # Cached feature vectors (.npz files)
+├── cleaning_results/       # Dataset cleaning reports and file lists
 ├── OnlineTestImages/       # Test images for online prediction
 ├── SCREENSHOTS/            # Application screenshots
 ├── app.py                  # Streamlit web application
@@ -102,6 +104,77 @@ ML-MINI-PROJECT/
 ├── FinalReport.pdf         # Project report
 └── .gitignore
 ```
+
+## 🧹 Data Cleaning
+
+The dataset was scraped from the web (Kaggle) and may contain corrupted, duplicate, or mislabeled images. We provide an automated cleaning tool to identify and remove problematic images.
+
+### Running the Dataset Cleaner
+
+```bash
+# Quick scan (corrupted + duplicates only, ~5-10 min)
+python src/dataset_cleaner.py --data-dir DS2GROCERIES --skip-outliers
+
+# Full scan with AI-based outlier detection (~30-60 min)
+python src/dataset_cleaner.py --data-dir DS2GROCERIES
+
+# Use fine-tuned model for better outlier detection
+python src/dataset_cleaner.py --data-dir DS2GROCERIES --model-path models/feature_extractor.pth
+
+# Find more outliers (10% contamination rate)
+python src/dataset_cleaner.py --data-dir DS2GROCERIES --contamination 0.1
+```
+
+### What the Cleaner Detects
+
+| Type | Description | Auto-Delete Safe? |
+|------|-------------|-------------------|
+| **Corrupted Images** | Images that fail to load or have invalid formats | ✅ Yes |
+| **Duplicate Images** | Near-identical images (using perceptual hashing) | ✅ Yes |
+| **Outliers** | Images that don't fit their labeled class (AI-detected) | ⚠️ Review first |
+
+### Output Files
+
+After running the cleaner, results are saved in `cleaning_results/`:
+
+| File | Description |
+|------|-------------|
+| `dataset_cleaning_report.html` | Visual HTML report for reviewing flagged images |
+| `safe_to_delete.txt` | Corrupted + duplicate images (safe to delete) |
+| `corrupted_images.txt` | List of corrupted images |
+| `duplicate_images.txt` | List of duplicate images to remove |
+| `outlier_images.txt` | Potential mislabeled images (review before deleting) |
+| `summary.json` | Summary statistics |
+
+### Deleting Flagged Images (PowerShell)
+
+**Delete corrupted + duplicate images** (safe):
+```powershell
+Get-Content cleaning_results\safe_to_delete.txt | ForEach-Object { Remove-Item $_ -Force -ErrorAction SilentlyContinue }
+```
+
+**Delete only duplicate images**:
+```powershell
+Get-Content cleaning_results\duplicate_images.txt | ForEach-Object { Remove-Item $_ -Force -ErrorAction SilentlyContinue }
+```
+
+**Delete ALL outliers** (use with caution - review first!):
+```powershell
+Get-Content cleaning_results\outlier_images.txt | Select-Object -Skip 1 | ForEach-Object { $_.Split("`t")[0] } | ForEach-Object { Remove-Item $_ -Force -ErrorAction SilentlyContinue }
+```
+
+**Delete only high-score outliers** (score > 2.0, more aggressive):
+```powershell
+Get-Content cleaning_results\outlier_images.txt | Select-Object -Skip 1 | ForEach-Object { $parts = $_.Split("`t"); if ([float]$parts[2] -gt 2.0) { Remove-Item $parts[0] -Force -ErrorAction SilentlyContinue } }
+```
+
+### Recommended Cleaning Workflow
+
+1. **Run the full scan**: `python src/dataset_cleaner.py --data-dir DS2GROCERIES`
+2. **Review the HTML report**: Open `cleaning_results/dataset_cleaning_report.html` in your browser
+3. **Delete safe files first**: Run the `safe_to_delete.txt` deletion command
+4. **Review outliers manually**: Look at the outlier images in the report before deleting
+5. **Re-train your model**: `python src/train.py`
 
 ## 🔬 Semi-Supervised Learning Algorithms
 

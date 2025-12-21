@@ -1,0 +1,15 @@
+{
+  "timestamp": "2025-12-21T22:18:55.264603",
+  "counts": {
+    "corrupted": 0,
+    "duplicates": 0,
+    "outliers": 1241,
+    "safe_to_delete": 0
+  },
+  "files": {
+    "corrupted": "cleaning_results\\corrupted_images.txt",
+    "duplicates": "cleaning_results\\duplicate_images.txt",
+    "outliers": "cleaning_results\\outlier_images.txt",
+    "safe_to_delete": "cleaning_results\\safe_to_delete.txt"
+  }
+}

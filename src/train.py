@@ -139,8 +139,8 @@ def train_models(
     # the quality of the features we extract later.
     extractor.fine_tune(
         labeled_loader,
-        epochs=10,  # 10 epochs is usually enough for fine-tuning on small data
-        learning_rate=1e-4  # Low learning rate to avoid destroying pretrained weights
+        epochs=20,  # Increased from 10 for better feature learning
+        learning_rate=5e-5  # Lower LR for more stable fine-tuning
     )
     
     # Save fine-tuned feature extractor
@@ -202,8 +202,8 @@ def train_models(
                 y_train_true=y_train, # Pass ground truth for full training accuracy
                 # Algorithm-specific parameters:
                 kernel='knn',      # Use k-Nearest Neighbors for graph construction
-                n_neighbors=7,     # Connect each point to its 7 nearest neighbors
-                max_iter=1000      # Maximum number of iterations for the algorithm to converge
+                n_neighbors=10,    # Increased from 7 for better label propagation
+                max_iter=2000      # Increased for better convergence
             )
             
             # Save the trained model to disk using Python's pickle module
@@ -305,7 +305,7 @@ def main():
     parser.add_argument(
         '--labeled-ratio',
         type=float,
-        default=0.1,
+        default=0.2,  # Increased from 0.1 for better accuracy
         help='Fraction of labeled training data (0.0 to 1.0)'
     )
     parser.add_argument(
