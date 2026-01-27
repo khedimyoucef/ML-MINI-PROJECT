@@ -31,3 +31,9 @@ huggingface_hub>=0.19.0
 
 # AMD GPU Support (Windows)
 torch-directml
+
+# MLOps - Weights & Biases
+wandb>=0.16.0
+
+# Configuration Management
+pyyaml>=6.0

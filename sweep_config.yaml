@@ -1,0 +1,71 @@
+# Weights & Biases Sweep Configuration
+# Hyperparameter Optimization for Semi-Supervised Grocery Classification
+#
+# Usage:
+#   wandb sweep sweep_config.yaml
+#   wandb agent <sweep_id> --count 10
+
+program: src/train_with_wandb.py
+method: bayes  # Bayesian optimization for efficient search
+name: grocery-ssl-hyperparameter-sweep
+
+metric:
+  name: test_accuracy
+  goal: maximize
+
+parameters:
+  # Semi-supervised learning ratio
+  labeled_ratio:
+    distribution: categorical
+    values:
+      - 0.1
+      - 0.15
+      - 0.2
+      - 0.25
+      - 0.3
+
+  # Algorithm selection
+  algorithm:
+    distribution: categorical
+    values:
+      - label_propagation
+      - label_spreading
+      - self_training
+
+  # Graph-based algorithm parameters
+  n_neighbors:
+    distribution: int_uniform
+    min: 5
+    max: 20
+
+  # Fine-tuning parameters
+  fine_tune_epochs:
+    distribution: categorical
+    values:
+      - 5
+      - 10
+      - 15
+
+  fine_tune_lr:
+    distribution: log_uniform_values
+    min: 0.00001
+    max: 0.001
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - --sweep
+  - "--data-dir"
+  - "DS2GROCERIES"
+  - "--output-dir"
+  - "models/sweep"
+  - "--features-dir"
+  - "features/sweep"
+
+# Early termination settings
+early_terminate:
+  type: hyperband
+  min_iter: 3
+  eta: 2
+  s: 3

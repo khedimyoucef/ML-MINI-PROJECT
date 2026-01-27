@@ -43,6 +43,7 @@ https://www.kaggle.com/datasets/pes12017000148/food-ingredients-and-recipe-datas
 - **3 SSL Algorithms**: Label Propagation, Label Spreading, Self-Training
 - **Interactive Web App**: Built with Streamlit for easy image classification
 - **Pretrained Feature Extraction**: Uses ResNet50 for robust image features
+- **🔄 MLOps with W&B**: Full experiment tracking, model versioning, data versioning, and production monitoring
 
 ## 🚀 Quick Start
 
@@ -271,6 +272,57 @@ To manually verify or install:
 pip install torch-directml
 ```
 
-## 📄 License
+## � MLOps with Weights & Biases
+
+This project implements a complete MLOps lifecycle using **Weights & Biases (W&B)**.
+
+### Quick Start with MLOps
+
+```bash
+# 1. Login to W&B (create free account at wandb.ai if needed)
+wandb login
+
+# 2. Run training with experiment tracking
+python src/train_with_wandb.py --labeled-ratio 0.2 --run-name my-experiment
+
+# 3. Create dataset version
+python src/data_versioning.py --version v1
+
+# 4. Run hyperparameter sweep
+wandb sweep sweep_config.yaml
+wandb agent <SWEEP_ID> --count 10
+
+# 5. Monitor inference
+python src/inference_monitor.py --n-samples 100
+```
+
+### MLOps Features
+
+| Feature | Description |
+|---------|-------------|
+| **Experiment Tracking** | Log hyperparameters, metrics, confusion matrices |
+| **Data Versioning** | Track dataset versions with W&B Artifacts |
+| **Model Registry** | Version, compare, and promote models |
+| **Hyperparameter Sweeps** | Bayesian optimization for best parameters |
+| **Production Monitoring** | Track inference, detect drift |
+
+### MLOps Files
+
+```
+src/
+├── wandb_config.py        # W&B configuration & utilities
+├── train_with_wandb.py    # Training with experiment tracking
+├── data_versioning.py     # Dataset artifact management
+├── model_registry.py      # Model versioning & registry
+└── inference_monitor.py   # Production monitoring
+
+sweep_config.yaml          # Hyperparameter sweep config
+MLOPS_README.md           # Detailed MLOps documentation
+```
+
+📖 **See [MLOPS_README.md](MLOPS_README.md) for comprehensive documentation.**
+
+## �📄 License
 
 This project is for educational purposes (ML Mini-Project).
+

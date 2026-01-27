@@ -37,7 +37,7 @@ from src.semi_supervised import (
 
 
 def train_models(
-    data_dir: str = "DS2GROCERIES",
+    data_dir: str = str(Path(__file__).parent.parent / "DS2GROCERIES"),
     output_dir: str = "models",
     features_dir: str = "features",
     labeled_ratio: float = 0.1,
@@ -287,7 +287,7 @@ def main():
     parser.add_argument(
         '--data-dir', 
         type=str, 
-        default='DS2GROCERIES',
+        default=str(Path(__file__).parent.parent / 'DS2GROCERIES'),
         help='Path to dataset directory'
     )
     parser.add_argument(
