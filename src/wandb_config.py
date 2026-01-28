@@ -48,7 +48,10 @@ DEFAULT_CONFIG = {
         "carrots", "cheese", "chicken", "cucumber", "eggs",
         "fish", "lettuce", "milk", "onions", "peppers",
         "potatoes", "sausages", "spinach", "tomato", "yogurt"
-    ]
+    ],
+    
+    # MLOps settings
+    "upload_artifacts": False,  # Default to False (save data), require flag to upload
 }
 
 
@@ -217,7 +220,13 @@ def log_model_artifact(
         type=artifact_type,
         metadata=metadata or {}
     )
-    artifact.add_file(model_path)
+    
+    # Check if uploads are enabled
+    if wandb.config.get("upload_artifacts", True):
+        artifact.add_file(model_path)
+    else:
+        # Just log metadata to the file, but don't upload the blob
+        print(f"  Note: Skipping upload of {model_path} (upload_artifacts=False)")
     
     wandb.log_artifact(artifact, aliases=aliases or ["latest"])
 
@@ -246,11 +255,13 @@ def log_dataset_artifact(
         metadata=metadata
     )
     
-    # Add sample images if provided
-    if sample_images:
+    # Add sample images if provided and uploads are enabled
+    if sample_images and wandb.config.get("upload_artifacts", True):
         for img_path in sample_images[:50]:  # Limit to 50 samples
             if os.path.exists(img_path):
                 artifact.add_file(img_path, name=f"samples/{Path(img_path).name}")
+    elif sample_images:
+        print(f"  Note: Skipping upload of sample images (upload_artifacts=False)")
     
     wandb.log_artifact(artifact, aliases=aliases or ["latest"])
 

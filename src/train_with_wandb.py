@@ -68,7 +68,8 @@ def train_with_wandb(
     n_neighbors: int = 10,
     max_iter: int = 2000,
     run_name: str = None,
-    sweep_mode: bool = False
+    sweep_mode: bool = False,
+    upload_artifacts: bool = False
 ):
     """
     Complete training pipeline with W&B experiment tracking.
@@ -86,7 +87,9 @@ def train_with_wandb(
         n_neighbors: Number of neighbors for graph-based algorithms
         max_iter: Maximum iterations for algorithms
         run_name: Optional name for the W&B run
+        run_name: Optional name for the W&B run
         sweep_mode: If True, use wandb.config for hyperparameters
+        upload_artifacts: If True, upload large artifacts
     """
     
     # Set defaults
@@ -108,7 +111,9 @@ def train_with_wandb(
         "fine_tune_epochs": fine_tune_epochs,
         "fine_tune_lr": fine_tune_lr,
         "n_neighbors": n_neighbors,
+        "n_neighbors": n_neighbors,
         "max_iter": max_iter,
+        "upload_artifacts": upload_artifacts,
     }
     
     # Initialize W&B
@@ -555,6 +560,11 @@ def main():
         action='store_true',
         help='Run as sweep agent'
     )
+    parser.add_argument(
+        '--upload-artifacts',
+        action='store_true',
+        help='Upload large artifacts (models) to W&B'
+    )
     
     args = parser.parse_args()
     
@@ -572,7 +582,9 @@ def main():
             fine_tune_epochs=args.fine_tune_epochs,
             fine_tune_lr=args.fine_tune_lr,
             n_neighbors=args.n_neighbors,
-            run_name=args.run_name
+            n_neighbors=args.n_neighbors,
+            run_name=args.run_name,
+            upload_artifacts=args.upload_artifacts
         )
 
 

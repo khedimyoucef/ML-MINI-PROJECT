@@ -35,7 +35,9 @@ def register_model(
     config: Optional[Dict[str, Any]] = None,
     aliases: Optional[List[str]] = None,
     description: str = None,
-    run_name: str = None
+    description: str = None,
+    run_name: str = None,
+    upload_artifacts: bool = False
 ) -> wandb.Artifact:
     """
     Register a trained model to W&B Model Registry.
@@ -48,7 +50,9 @@ def register_model(
         config: Training configuration
         aliases: List of aliases (e.g., ["latest", "best", "production"])
         description: Model description
+        description: Model description
         run_name: Optional W&B run name
+        upload_artifacts: If True, upload model file
         
     Returns:
         W&B Artifact
@@ -57,10 +61,15 @@ def register_model(
     run = init_wandb(
         run_name=run_name or f"register-{model_name}",
         config=config,
+        config=config,
         tags=["model-registry"],
         notes=description,
         job_type="model-registration"
     )
+    
+    # Update upload_artifacts in config if manually passed
+    if upload_artifacts:
+        wandb.config.update({"upload_artifacts": True}, allow_val_change=True)
     
     try:
         print("=" * 60)
@@ -294,7 +303,8 @@ def promote_model(
 
 def register_all_models(
     models_dir: str = "models",
-    training_results_path: str = None
+    training_results_path: str = None,
+    upload_artifacts: bool = False
 ):
     """
     Register all trained models from a directory.
@@ -335,7 +345,11 @@ def register_all_models(
             metrics=metrics,
             config=config,
             aliases=["latest"],
-            description=f"Semi-supervised {algo_name} classifier for grocery images"
+            metrics=metrics,
+            config=config,
+            aliases=["latest"],
+            description=f"Semi-supervised {algo_name} classifier for grocery images",
+            upload_artifacts=upload_artifacts
         )
         
         print()  # Blank line between registrations
@@ -354,12 +368,15 @@ def main():
     register_parser.add_argument("--accuracy", type=float, help="Test accuracy")
     register_parser.add_argument("--f1", type=float, help="F1 score")
     register_parser.add_argument("--alias", nargs="+", default=["latest"], help="Aliases")
+    register_parser.add_argument("--alias", nargs="+", default=["latest"], help="Aliases")
     register_parser.add_argument("--description", help="Description")
+    register_parser.add_argument("--upload-artifacts", action="store_true", help="Upload model file")
     
     # Register all command
     register_all_parser = subparsers.add_parser("register-all", help="Register all models")
     register_all_parser.add_argument("--models-dir", default="models", help="Models directory")
     register_all_parser.add_argument("--results", help="Training results JSON path")
+    register_all_parser.add_argument("--upload-artifacts", action="store_true", help="Upload model files")
     
     # List command
     list_parser = subparsers.add_parser("list", help="List registered models")
@@ -389,13 +406,17 @@ def main():
             model_name=args.name,
             metrics=metrics if metrics else None,
             aliases=args.alias,
-            description=args.description
+            metrics=metrics if metrics else None,
+            aliases=args.alias,
+            description=args.description,
+            upload_artifacts=args.upload_artifacts
         )
         
     elif args.command == "register-all":
         register_all_models(
             models_dir=args.models_dir,
-            training_results_path=args.results
+            training_results_path=args.results,
+            upload_artifacts=args.upload_artifacts
         )
         
     elif args.command == "list":

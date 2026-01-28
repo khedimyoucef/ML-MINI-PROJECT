@@ -41,7 +41,8 @@ def create_dataset_artifact(
     description: str = None,
     include_samples: bool = True,
     samples_per_class: int = 3,
-    run_name: str = None
+    run_name: str = None,
+    upload_artifacts: bool = False
 ) -> wandb.Artifact:
     """
     Create a W&B artifact for the dataset with metadata and sample images.
@@ -57,6 +58,7 @@ def create_dataset_artifact(
         include_samples: Whether to include sample images
         samples_per_class: Number of samples per class to include
         run_name: Optional run name
+        upload_artifacts: If True, upload artifact files
         
     Returns:
         W&B Artifact object
@@ -68,6 +70,10 @@ def create_dataset_artifact(
         notes=description or f"Dataset artifact {artifact_name} {version}",
         job_type="data-versioning"
     )
+    
+    # Update upload_artifacts in config if manually passed
+    if upload_artifacts:
+        wandb.config.update({"upload_artifacts": True}, allow_val_change=True)
     
     try:
         print("=" * 60)
@@ -390,6 +396,11 @@ def main():
         help='Skip including sample images'
     )
     parser.add_argument(
+        '--upload-artifacts',
+        action='store_true',
+        help='Upload artifact files (images)'
+    )
+    parser.add_argument(
         '--quality-check',
         action='store_true',
         help='Only run data quality check (no artifact creation)'
@@ -406,7 +417,8 @@ def main():
             version=args.version,
             description=args.description,
             include_samples=not args.no_samples,
-            samples_per_class=args.samples_per_class
+            samples_per_class=args.samples_per_class,
+            upload_artifacts=args.upload_artifacts
         )
 
 
