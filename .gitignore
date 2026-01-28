@@ -17,3 +17,6 @@ src/token.txt
 .streamlit/
 pdf_content.txt
 Secrets/
+DS4FOODNUTRIENTS/
+cleaning_results/
+wandb/
