@@ -111,7 +111,6 @@ def train_with_wandb(
         "fine_tune_epochs": fine_tune_epochs,
         "fine_tune_lr": fine_tune_lr,
         "n_neighbors": n_neighbors,
-        "n_neighbors": n_neighbors,
         "max_iter": max_iter,
         "upload_artifacts": upload_artifacts,
     }
@@ -133,7 +132,11 @@ def train_with_wandb(
             algorithms = [wandb.config["algorithm"]]
         n_neighbors = wandb.config.get("n_neighbors", n_neighbors)
         fine_tune_epochs = wandb.config.get("fine_tune_epochs", fine_tune_epochs)
+        fine_tune_epochs = wandb.config.get("fine_tune_epochs", fine_tune_epochs)
         fine_tune_lr = wandb.config.get("fine_tune_lr", fine_tune_lr)
+        
+        # Explicitly set upload_artifacts in config for sweep runs
+        wandb.config.update({"upload_artifacts": upload_artifacts}, allow_val_change=True)
     
     try:
         print("=" * 60)
@@ -581,7 +584,6 @@ def main():
             device=args.device,
             fine_tune_epochs=args.fine_tune_epochs,
             fine_tune_lr=args.fine_tune_lr,
-            n_neighbors=args.n_neighbors,
             n_neighbors=args.n_neighbors,
             run_name=args.run_name,
             upload_artifacts=args.upload_artifacts
